@@ -6,16 +6,17 @@ Produkcyjny bot głosowy na stoisko: 8h/dzień, keepalive, auto-reconnect, live 
 
 import logging
 import os
+import queue
 import signal
 import sys
 import time
 import threading
 from datetime import datetime
 
+import pyaudio
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.conversational_ai.conversation import Conversation
-from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+from elevenlabs.conversational_ai.conversation import Conversation, AudioInterface
 
 load_dotenv()
 
@@ -54,6 +55,90 @@ logging.basicConfig(
 log = logging.getLogger("cashibot")
 
 _shutdown = threading.Event()
+
+# ---------------------------------------------------------------------------
+# Buforowany interfejs audio – eliminuje cięcia przy jitterze sieci
+# ---------------------------------------------------------------------------
+
+class BufferedAudioInterface(AudioInterface):
+    """
+    Własna implementacja AudioInterface z kolejką wyjściową.
+    Sieć może dostarczać audio nieregularnie – kolejka wygładza odtwarzanie.
+    """
+    RATE = 16000
+    CHANNELS = 1
+    FORMAT = pyaudio.paInt16
+    INPUT_CHUNK = 4000   # 250ms – zalecane przez ElevenLabs
+    OUTPUT_CHUNK = 8192  # większy bufor wyjściowy = mniej cięć
+
+    def start(self, input_callback):
+        self._pa = pyaudio.PyAudio()
+        self._stop = threading.Event()
+        self._out_queue = queue.Queue()
+
+        self._in_stream = self._pa.open(
+            format=self.FORMAT,
+            channels=self.CHANNELS,
+            rate=self.RATE,
+            input=True,
+            frames_per_buffer=self.INPUT_CHUNK,
+        )
+        self._out_stream = self._pa.open(
+            format=self.FORMAT,
+            channels=self.CHANNELS,
+            rate=self.RATE,
+            output=True,
+            frames_per_buffer=self.OUTPUT_CHUNK,
+        )
+
+        threading.Thread(target=self._reader, args=(input_callback,), daemon=True).start()
+        threading.Thread(target=self._writer, daemon=True).start()
+
+    def _reader(self, callback):
+        while not self._stop.is_set():
+            try:
+                data = self._in_stream.read(self.INPUT_CHUNK, exception_on_overflow=False)
+                callback(data)
+            except Exception:
+                break
+
+    def _writer(self):
+        while not self._stop.is_set():
+            try:
+                chunk = self._out_queue.get(timeout=0.1)
+                if chunk is None:
+                    break
+                self._out_stream.write(chunk)
+            except queue.Empty:
+                continue
+            except Exception:
+                break
+
+    def stop(self):
+        self._stop.set()
+        self._out_queue.put(None)
+        try:
+            self._in_stream.stop_stream()
+            self._in_stream.close()
+            self._out_stream.stop_stream()
+            self._out_stream.close()
+            self._pa.terminate()
+        except Exception:
+            pass
+
+    def output(self, audio: bytes):
+        try:
+            self._out_queue.put_nowait(audio)
+        except queue.Full:
+            pass  # pełna kolejka = odrzucamy chunk zamiast blokować
+
+    def interrupt(self):
+        while not self._out_queue.empty():
+            try:
+                self._out_queue.get_nowait()
+            except queue.Empty:
+                break
+
 
 # ---------------------------------------------------------------------------
 # Wątki pomocnicze sesji
@@ -103,7 +188,7 @@ def uruchom_sesje(klient: ElevenLabs, numer: int) -> None:
         client=klient,
         agent_id=AGENT_ID,
         requires_auth=True,
-        audio_interface=DefaultAudioInterface(),
+        audio_interface=BufferedAudioInterface(),
         callback_user_transcript=lambda text: log.info("[TY]  %s", text),
         callback_agent_response=lambda text: log.info("[BOT] %s", text),
     )
