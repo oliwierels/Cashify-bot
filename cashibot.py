@@ -72,6 +72,7 @@ class BufferedAudioInterface(AudioInterface):
     OUTPUT_CHUNK = 8192  # większy bufor wyjściowy = mniej cięć
 
     def start(self, input_callback):
+        log.info("Uruchamiam interfejs audio...")
         self._pa = pyaudio.PyAudio()
         self._stop = threading.Event()
         self._out_queue = queue.Queue()
@@ -95,6 +96,7 @@ class BufferedAudioInterface(AudioInterface):
         threading.Thread(target=self._writer, daemon=True).start()
 
     def _reader(self, callback):
+        log.info("Mikrofon gotowy. Oczekuję na audio do rozpoznania...")
         while not self._stop.is_set():
             try:
                 data = self._in_stream.read(self.INPUT_CHUNK, exception_on_overflow=False)
@@ -103,6 +105,7 @@ class BufferedAudioInterface(AudioInterface):
                 break
 
     def _writer(self):
+        log.info("Interfejs audio gotowy. Oczekuję na audio do odtworzenia...")
         while not self._stop.is_set():
             try:
                 chunk = self._out_queue.get(timeout=0.1)
@@ -115,6 +118,7 @@ class BufferedAudioInterface(AudioInterface):
                 break
 
     def stop(self):
+        log.info("Zatrzymuję interfejs audio.")
         self._stop.set()
         self._out_queue.put(None)
         try:
@@ -127,12 +131,15 @@ class BufferedAudioInterface(AudioInterface):
             pass
 
     def output(self, audio: bytes):
+        log.info("Otrzymano audio do odtworzenia (%d bytes).", len(audio))
         try:
             self._out_queue.put_nowait(audio)
         except queue.Full:
             pass  # pełna kolejka = odrzucamy chunk zamiast blokować
 
     def interrupt(self):
+        log.info("Przerywam odtwarzanie audio.")
+        # Czyścimy kolejkę audio (zatrzymujemy głośnik)
         while not self._out_queue.empty():
             try:
                 self._out_queue.get_nowait()
@@ -278,3 +285,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
