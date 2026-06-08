@@ -38,6 +38,27 @@
     }
     button:disabled { opacity: 0.5; cursor: default; }
     button.active { background: #ef4444; }
+    .context-form {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      gap: 8px;
+    }
+    .context-form.visible { display: flex; }
+    .context-form input {
+      flex: 1;
+      font-size: 1rem;
+      padding: 12px 16px;
+      border-radius: 999px;
+      border: 1px solid #3f3f46;
+      background: #18181b;
+      color: #f4f4f5;
+    }
+    .context-form button {
+      font-size: 1rem;
+      padding: 12px 24px;
+      background: #3f3f46;
+    }
     #status {
       font-size: 0.95rem;
       color: #a1a1aa;
@@ -62,9 +83,15 @@
 <body>
   <div class="wrap">
     <h1>CashiBot</h1>
-    <p>Podlacz mikrofon i glosnik (np. DJI mic przez Bluetooth), nacisnij start i zaczynaj rozmowe.</p>
+    <p>Podlacz mikrofon i glosnik (np. DJI mic przez Bluetooth), nacisnij start i zaczynaj rozmowe. W trakcie rozmowy mozesz wpisac w pole ponizej, co bot ma wkomponowac w rozmowe.</p>
     <button id="toggle">Start rozmowy</button>
     <div id="status">Gotowy</div>
+
+    <form id="contextForm" class="context-form">
+      <input id="contextInput" type="text" placeholder="Co bot ma wkomponowac w rozmowe..." autocomplete="off">
+      <button type="submit">Wyslij</button>
+    </form>
+
     <div id="log"></div>
   </div>
 
@@ -74,6 +101,8 @@
     const toggleBtn = document.getElementById("toggle");
     const statusEl = document.getElementById("status");
     const logEl = document.getElementById("log");
+    const contextForm = document.getElementById("contextForm");
+    const contextInput = document.getElementById("contextInput");
 
     let conversation = null;
 
@@ -110,12 +139,14 @@
             toggleBtn.textContent = "Zakoncz rozmowe";
             toggleBtn.classList.add("active");
             toggleBtn.disabled = false;
+            contextForm.classList.add("visible");
           },
           onDisconnect: () => {
             setStatus("Rozlaczono");
             toggleBtn.textContent = "Start rozmowy";
             toggleBtn.classList.remove("active");
             toggleBtn.disabled = false;
+            contextForm.classList.remove("visible");
             conversation = null;
           },
           onError: (err) => {
@@ -148,6 +179,15 @@
       } else {
         startConversation();
       }
+    });
+
+    contextForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = contextInput.value.trim();
+      if (!text || !conversation) return;
+      conversation.sendContextualUpdate(text);
+      addLog("you", "(kontekst) " + text);
+      contextInput.value = "";
     });
   </script>
 </body>
