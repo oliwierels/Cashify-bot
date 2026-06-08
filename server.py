@@ -5,11 +5,15 @@ Dziala na telefonie: mikrofon/glosnik obsluguje przegladarka (np. przez Bluetoot
 Klucz API zostaje bezpiecznie po stronie serwera - frontend dostaje tylko jednorazowy signed URL.
 """
 
+import logging
 import os
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from flask import Flask, jsonify, send_from_directory
+
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("cashibot-web")
 
 load_dotenv()
 
@@ -33,8 +37,12 @@ def index():
 
 @app.get("/api/signed-url")
 def signed_url():
-    response = client.conversational_ai.conversations.get_signed_url(agent_id=AGENT_ID)
-    return jsonify({"signedUrl": response.signed_url})
+    try:
+        response = client.conversational_ai.conversations.get_signed_url(agent_id=AGENT_ID)
+        return jsonify({"signedUrl": response.signed_url})
+    except Exception as e:
+        log.error("Nie udalo sie pobrac signed URL: %s: %s", type(e).__name__, e)
+        return jsonify({"error": f"{type(e).__name__}: {e}"}), 502
 
 
 if __name__ == "__main__":
