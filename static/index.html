@@ -59,6 +59,17 @@
       padding: 12px 24px;
       background: #3f3f46;
     }
+    .volume-row {
+      display: none;
+      width: 100%;
+      max-width: 480px;
+      align-items: center;
+      gap: 12px;
+      color: #a1a1aa;
+      font-size: 0.9rem;
+    }
+    .volume-row.visible { display: flex; }
+    .volume-row input[type="range"] { flex: 1; }
     #status {
       font-size: 0.95rem;
       color: #a1a1aa;
@@ -87,6 +98,12 @@
     <button id="toggle">Start rozmowy</button>
     <div id="status">Gotowy</div>
 
+    <div id="volumeRow" class="volume-row">
+      <span>Glosnosc bota</span>
+      <input id="volumeSlider" type="range" min="0" max="100" value="100">
+      <span id="volumeValue">100%</span>
+    </div>
+
     <form id="contextForm" class="context-form">
       <input id="contextInput" type="text" placeholder="Co bot ma wkomponowac w rozmowe..." autocomplete="off">
       <button type="submit">Wyslij</button>
@@ -103,6 +120,9 @@
     const logEl = document.getElementById("log");
     const contextForm = document.getElementById("contextForm");
     const contextInput = document.getElementById("contextInput");
+    const volumeRow = document.getElementById("volumeRow");
+    const volumeSlider = document.getElementById("volumeSlider");
+    const volumeValue = document.getElementById("volumeValue");
 
     let conversation = null;
 
@@ -146,6 +166,8 @@
             toggleBtn.classList.add("active");
             toggleBtn.disabled = false;
             contextForm.classList.add("visible");
+            volumeRow.classList.add("visible");
+            conversation.setVolume({ volume: volumeSlider.value / 100 });
           },
           onDisconnect: () => {
             setStatus("Rozlaczono");
@@ -153,6 +175,7 @@
             toggleBtn.classList.remove("active");
             toggleBtn.disabled = false;
             contextForm.classList.remove("visible");
+            volumeRow.classList.remove("visible");
             conversation = null;
           },
           onError: (err) => {
@@ -194,6 +217,12 @@
       conversation.sendContextualUpdate(text);
       addLog("you", "(kontekst) " + text);
       contextInput.value = "";
+    });
+
+    volumeSlider.addEventListener("input", () => {
+      const pct = Number(volumeSlider.value);
+      volumeValue.textContent = pct + "%";
+      if (conversation) conversation.setVolume({ volume: pct / 100 });
     });
   </script>
 </body>
