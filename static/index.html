@@ -129,7 +129,13 @@
       toggleBtn.disabled = true;
       setStatus("Laczenie...");
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
         const signedUrl = await fetchSignedUrl();
 
         conversation = await Conversation.startSession({
