@@ -167,7 +167,6 @@
             toggleBtn.disabled = false;
             contextForm.classList.add("visible");
             volumeRow.classList.add("visible");
-            conversation.setVolume({ volume: volumeSlider.value / 100 });
           },
           onDisconnect: () => {
             setStatus("Rozlaczono");
@@ -187,6 +186,7 @@
             if (source === "ai") addLog("bot", message);
           },
         });
+        conversation.setVolume({ volume: volumeSlider.value / 100 });
       } catch (err) {
         console.error(err);
         setStatus("Blad: " + err.message);
