@@ -17,8 +17,8 @@ log = logging.getLogger("cashibot-web")
 
 load_dotenv()
 
-API_KEY = os.getenv("ELEVENLABS_API_KEY")
-AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID")
+API_KEY = (os.getenv("ELEVENLABS_API_KEY") or "").strip()
+AGENT_ID = (os.getenv("ELEVENLABS_AGENT_ID") or "").strip()
 
 if not API_KEY:
     raise RuntimeError("Brak ELEVENLABS_API_KEY w zmiennych srodowiskowych")
