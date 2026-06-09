@@ -70,14 +70,6 @@
     }
     .volume-row.visible { display: flex; }
     .volume-row input[type="range"] { flex: 1; }
-    #muteBtn {
-      display: none;
-      font-size: 1.1rem;
-      padding: 14px 32px;
-      background: #3f3f46;
-    }
-    #muteBtn.visible { display: inline-block; }
-    #muteBtn.muted { background: #b45309; }
     #status {
       font-size: 0.95rem;
       color: #a1a1aa;
@@ -104,7 +96,6 @@
     <h1>CashiBot</h1>
     <p>Podlacz mikrofon i glosnik (np. DJI mic przez Bluetooth), nacisnij start i zaczynaj rozmowe. W trakcie rozmowy mozesz wpisac w pole ponizej, co bot ma wkomponowac w rozmowe.</p>
     <button id="toggle">Start rozmowy</button>
-    <button id="muteBtn">🎤 Mikrofon włączony</button>
     <div id="status">Gotowy</div>
 
     <div id="volumeRow" class="volume-row">
@@ -132,11 +123,8 @@
     const volumeRow = document.getElementById("volumeRow");
     const volumeSlider = document.getElementById("volumeSlider");
     const volumeValue = document.getElementById("volumeValue");
-    const muteBtn = document.getElementById("muteBtn");
 
     let conversation = null;
-    let micStream = null;
-    let micMuted = false;
 
     function setStatus(text) {
       statusEl.textContent = text;
@@ -161,7 +149,7 @@
       toggleBtn.disabled = true;
       setStatus("Laczenie...");
       try {
-        micStream = await navigator.mediaDevices.getUserMedia({
+        await navigator.mediaDevices.getUserMedia({
           audio: {
             echoCancellation: true,
             noiseSuppression: true,
@@ -179,7 +167,6 @@
             toggleBtn.disabled = false;
             contextForm.classList.add("visible");
             volumeRow.classList.add("visible");
-            muteBtn.classList.add("visible");
           },
           onDisconnect: () => {
             setStatus("Rozlaczono");
@@ -188,11 +175,6 @@
             toggleBtn.disabled = false;
             contextForm.classList.remove("visible");
             volumeRow.classList.remove("visible");
-            muteBtn.classList.remove("visible");
-            muteBtn.classList.remove("muted");
-            muteBtn.textContent = "🎤 Mikrofon włączony";
-            micMuted = false;
-            if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
             conversation = null;
           },
           onError: (err) => {
@@ -241,14 +223,6 @@
       const pct = Number(volumeSlider.value);
       volumeValue.textContent = pct + "%";
       if (conversation) conversation.setVolume({ volume: pct / 100 });
-    });
-
-    muteBtn.addEventListener("click", () => {
-      if (!micStream) return;
-      micMuted = !micMuted;
-      micStream.getAudioTracks().forEach(t => { t.enabled = !micMuted; });
-      muteBtn.textContent = micMuted ? "🔇 Mikrofon wyłączony" : "🎤 Mikrofon włączony";
-      muteBtn.classList.toggle("muted", micMuted);
     });
   </script>
 </body>
