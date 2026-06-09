@@ -75,7 +75,8 @@ class BufferedAudioInterface(AudioInterface):
         self._pa = pyaudio.PyAudio()
         self._stop = threading.Event()
         self._out_queue = queue.Queue()
-        self._playing = threading.Event()  # True gdy bot aktualnie gra audio
+        self._playing = threading.Event()
+        self._last_chunk_time = 0.0
 
         self._in_stream = self._pa.open(
             format=self.FORMAT,
@@ -114,8 +115,10 @@ class BufferedAudioInterface(AudioInterface):
                     break
                 self._playing.set()
                 self._out_stream.write(chunk)
+                self._last_chunk_time = time.monotonic()
             except queue.Empty:
-                self._playing.clear()
+                if self._playing.is_set() and time.monotonic() - self._last_chunk_time > 0.4:
+                    self._playing.clear()
                 continue
             except Exception:
                 break
