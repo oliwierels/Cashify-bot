@@ -75,6 +75,7 @@ class BufferedAudioInterface(AudioInterface):
         self._pa = pyaudio.PyAudio()
         self._stop = threading.Event()
         self._out_queue = queue.Queue()
+        self._last_output_time = 0.0  # timestamp ostatniego odtworzonego chunka
 
         self._in_stream = self._pa.open(
             format=self.FORMAT,
@@ -94,11 +95,14 @@ class BufferedAudioInterface(AudioInterface):
         threading.Thread(target=self._reader, args=(input_callback,), daemon=True).start()
         threading.Thread(target=self._writer, daemon=True).start()
 
+    POST_SPEECH_MUTE_SECS = 0.30  # cisza po wypowiedzi bota przed wznowieniem nasłuchu
+
     def _reader(self, callback):
         while not self._stop.is_set():
             try:
                 data = self._in_stream.read(self.INPUT_CHUNK, exception_on_overflow=False)
-                callback(data)
+                if time.monotonic() - self._last_output_time >= self.POST_SPEECH_MUTE_SECS:
+                    callback(data)
             except Exception:
                 break
 
@@ -109,6 +113,7 @@ class BufferedAudioInterface(AudioInterface):
                 if chunk is None:
                     break
                 self._out_stream.write(chunk)
+                self._last_output_time = time.monotonic()
             except queue.Empty:
                 continue
             except Exception:
