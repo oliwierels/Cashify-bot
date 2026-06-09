@@ -75,8 +75,6 @@ class BufferedAudioInterface(AudioInterface):
         self._pa = pyaudio.PyAudio()
         self._stop = threading.Event()
         self._out_queue = queue.Queue()
-        self._playing = threading.Event()
-        self._last_chunk_time = 0.0
 
         self._in_stream = self._pa.open(
             format=self.FORMAT,
@@ -100,9 +98,6 @@ class BufferedAudioInterface(AudioInterface):
         while not self._stop.is_set():
             try:
                 data = self._in_stream.read(self.INPUT_CHUNK, exception_on_overflow=False)
-                # Gdy bot mówi, wysyłamy ciszę zamiast echa z mikrofonu
-                if self._playing.is_set():
-                    data = bytes(len(data))
                 callback(data)
             except Exception:
                 break
@@ -113,12 +108,8 @@ class BufferedAudioInterface(AudioInterface):
                 chunk = self._out_queue.get(timeout=0.1)
                 if chunk is None:
                     break
-                self._playing.set()
                 self._out_stream.write(chunk)
-                self._last_chunk_time = time.monotonic()
             except queue.Empty:
-                if self._playing.is_set() and time.monotonic() - self._last_chunk_time > 0.4:
-                    self._playing.clear()
                 continue
             except Exception:
                 break
