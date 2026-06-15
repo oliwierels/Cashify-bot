@@ -27,6 +27,13 @@ load_dotenv()
 KLUCZ_API = os.getenv("ELEVENLABS_API_KEY")
 AGENT_ID = os.getenv("ELEVENLABS_AGENT_ID")
 
+# Fragment nazwy urzadzenia audio (np. "JBL", "DJI") - jesli ustawiony,
+# wybieramy pierwsze urzadzenie wejscia/wyjscia, ktorego nazwa go zawiera.
+# Pomaga, gdy system uzywa innego urzadzenia domyslnego niz podlaczony
+# mikrofon/glosnik Bluetooth.
+INPUT_DEVICE_NAME = os.getenv("INPUT_DEVICE_NAME", "").strip()
+OUTPUT_DEVICE_NAME = os.getenv("OUTPUT_DEVICE_NAME", "").strip()
+
 # Keepalive: ElevenLabs rozłącza sesję po ~30s ciszy – pingujemy co 20s.
 KEEPALIVE_INTERVAL = 20
 
@@ -60,6 +67,35 @@ _shutdown = threading.Event()
 # Buforowany interfejs audio – eliminuje cięcia przy jitterze sieci
 # ---------------------------------------------------------------------------
 
+def znajdz_urzadzenie(pa: "pyaudio.PyAudio", nazwa: str, wejscie: bool) -> int | None:
+    """Szuka urzadzenia audio, ktorego nazwa zawiera podany fragment (bez rozr. wielkosci liter).
+
+    `wejscie=True` szuka urzadzenia z kanalami wejsciowymi (mikrofon),
+    `wejscie=False` - z kanalami wyjsciowymi (glosnik).
+    """
+    nazwa_lower = nazwa.lower()
+    for i in range(pa.get_device_count()):
+        info = pa.get_device_info_by_index(i)
+        kanaly = info["maxInputChannels"] if wejscie else info["maxOutputChannels"]
+        if kanaly > 0 and nazwa_lower in info["name"].lower():
+            return i
+    return None
+
+
+def wypisz_urzadzenia() -> None:
+    """Wypisuje dostepne urzadzenia audio wraz z ich indeksami - pomocne przy konfiguracji."""
+    pa = pyaudio.PyAudio()
+    try:
+        for i in range(pa.get_device_count()):
+            info = pa.get_device_info_by_index(i)
+            print(
+                f"[{i}] {info['name']} "
+                f"(in={info['maxInputChannels']}, out={info['maxOutputChannels']})"
+            )
+    finally:
+        pa.terminate()
+
+
 class BufferedAudioInterface(AudioInterface):
     """
     Własna implementacja AudioInterface z kolejką wyjściową.
@@ -79,11 +115,28 @@ class BufferedAudioInterface(AudioInterface):
         self._out_queue = queue.Queue()
         self._mute_until = 0.0
 
+        input_device = None
+        if INPUT_DEVICE_NAME:
+            input_device = znajdz_urzadzenie(self._pa, INPUT_DEVICE_NAME, wejscie=True)
+            if input_device is None:
+                log.warning("Nie znaleziono urzadzenia wejsciowego zawierajacego '%s' - uzywam domyslnego.", INPUT_DEVICE_NAME)
+            else:
+                log.info("Wejscie audio: %s", self._pa.get_device_info_by_index(input_device)["name"])
+
+        output_device = None
+        if OUTPUT_DEVICE_NAME:
+            output_device = znajdz_urzadzenie(self._pa, OUTPUT_DEVICE_NAME, wejscie=False)
+            if output_device is None:
+                log.warning("Nie znaleziono urzadzenia wyjsciowego zawierajacego '%s' - uzywam domyslnego.", OUTPUT_DEVICE_NAME)
+            else:
+                log.info("Wyjscie audio: %s", self._pa.get_device_info_by_index(output_device)["name"])
+
         self._in_stream = self._pa.open(
             format=self.FORMAT,
             channels=self.CHANNELS,
             rate=self.RATE,
             input=True,
+            input_device_index=input_device,
             frames_per_buffer=self.INPUT_CHUNK,
         )
         self._out_stream = self._pa.open(
@@ -91,6 +144,7 @@ class BufferedAudioInterface(AudioInterface):
             channels=self.CHANNELS,
             rate=self.RATE,
             output=True,
+            output_device_index=output_device,
             frames_per_buffer=self.OUTPUT_CHUNK,
         )
 
@@ -238,6 +292,10 @@ def uruchom_sesje(klient: ElevenLabs, numer: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    if "--list-devices" in sys.argv:
+        wypisz_urzadzenia()
+        return
+
     if not KLUCZ_API:
         print("BLAD: Brak ELEVENLABS_API_KEY w pliku .env")
         sys.exit(1)
