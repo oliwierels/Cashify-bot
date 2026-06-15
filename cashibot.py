@@ -4,6 +4,7 @@ CashiBot - Conversational AI Agent
 Produkcyjny bot głosowy na stoisko: 8h/dzień, keepalive, auto-reconnect, live context.
 """
 
+import argparse
 import logging
 import os
 import queue
@@ -292,9 +293,21 @@ def uruchom_sesje(klient: ElevenLabs, numer: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    if "--list-devices" in sys.argv:
+    parser = argparse.ArgumentParser(description="CashiBot - bot glosowy")
+    parser.add_argument("--list-devices", action="store_true", help="Wypisz dostepne urzadzenia audio i zakoncz.")
+    parser.add_argument("--input", metavar="NAZWA", help="Fragment nazwy mikrofonu (nadpisuje INPUT_DEVICE_NAME).")
+    parser.add_argument("--output", metavar="NAZWA", help="Fragment nazwy glosnika (nadpisuje OUTPUT_DEVICE_NAME).")
+    args = parser.parse_args()
+
+    if args.list_devices:
         wypisz_urzadzenia()
         return
+
+    global INPUT_DEVICE_NAME, OUTPUT_DEVICE_NAME
+    if args.input:
+        INPUT_DEVICE_NAME = args.input
+    if args.output:
+        OUTPUT_DEVICE_NAME = args.output
 
     if not KLUCZ_API:
         print("BLAD: Brak ELEVENLABS_API_KEY w pliku .env")
