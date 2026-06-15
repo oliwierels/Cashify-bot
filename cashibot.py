@@ -97,6 +97,49 @@ def wypisz_urzadzenia() -> None:
         pa.terminate()
 
 
+def test_audio(nazwa_wyjscia: str) -> None:
+    """Puszcza krotki sygnal testowy (beep) na wybranym wyjsciu audio - do diagnostyki glosnika."""
+    import math
+    import struct
+
+    rate = 16000
+    czas = 1.5
+    czestotliwosc = 440.0
+    probki = int(rate * czas)
+    dane = b"".join(
+        struct.pack("<h", int(16000 * math.sin(2 * math.pi * czestotliwosc * i / rate)))
+        for i in range(probki)
+    )
+
+    pa = pyaudio.PyAudio()
+    try:
+        output_device = None
+        if nazwa_wyjscia:
+            output_device = znajdz_urzadzenie(pa, nazwa_wyjscia, wejscie=False)
+            if output_device is None:
+                print(f"Nie znaleziono urzadzenia wyjsciowego zawierajacego '{nazwa_wyjscia}'.")
+                return
+
+        info = pa.get_device_info_by_index(
+            output_device if output_device is not None else pa.get_default_output_device_info()["index"]
+        )
+        print(f"Odtwarzanie testowego dzwieku na: {info['name']}")
+
+        stream = pa.open(
+            format=pyaudio.paInt16,
+            channels=1,
+            rate=rate,
+            output=True,
+            output_device_index=output_device,
+        )
+        stream.write(dane)
+        stream.stop_stream()
+        stream.close()
+        print("Gotowe. Jesli nie slyszysz beepa, sprawdz glosnosc/polaczenie Bluetooth.")
+    finally:
+        pa.terminate()
+
+
 class BufferedAudioInterface(AudioInterface):
     """
     Własna implementacja AudioInterface z kolejką wyjściową.
@@ -293,17 +336,23 @@ def uruchom_sesje(klient: ElevenLabs, numer: int) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    global INPUT_DEVICE_NAME, OUTPUT_DEVICE_NAME
+
     parser = argparse.ArgumentParser(description="CashiBot - bot glosowy")
     parser.add_argument("--list-devices", action="store_true", help="Wypisz dostepne urzadzenia audio i zakoncz.")
     parser.add_argument("--input", metavar="NAZWA", help="Fragment nazwy mikrofonu (nadpisuje INPUT_DEVICE_NAME).")
     parser.add_argument("--output", metavar="NAZWA", help="Fragment nazwy glosnika (nadpisuje OUTPUT_DEVICE_NAME).")
+    parser.add_argument("--test-audio", action="store_true", help="Odtworz testowy beep na wybranym wyjsciu i zakoncz.")
     args = parser.parse_args()
 
     if args.list_devices:
         wypisz_urzadzenia()
         return
 
-    global INPUT_DEVICE_NAME, OUTPUT_DEVICE_NAME
+    if args.test_audio:
+        test_audio(args.output or OUTPUT_DEVICE_NAME)
+        return
+
     if args.input:
         INPUT_DEVICE_NAME = args.input
     if args.output:
