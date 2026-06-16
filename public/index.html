@@ -6,6 +6,46 @@
   <meta name="theme-color" content="#0b0d12" />
   <title>CashiBot — asystent głosowy</title>
   <link rel="stylesheet" href="/styles.css" />
+
+  <!--
+    FIX (Android / Bluetooth A2DP) — instalowane SYNCHRONICZNIE, przed bundlem SDK.
+    Android/Chrome przełącza sesję audio w tryb "rozmowy" (MODE_IN_COMMUNICATION),
+    gdy mikrofon jest przechwytywany z echoCancellation=true. W tym trybie dźwięk
+    omija profil multimedialny A2DP (leci na głośnik telefonu lub niskiej jakości SCO).
+    SDK ElevenLabs/LiveKit na stałe ustawia echoCancellation/noiseSuppression/
+    autoGainControl = true. Dlatego globalnie przechwytujemy getUserMedia i — gdy
+    włączony jest tryb Bluetooth (window.__forceMediaProfile) — wyłączamy te flagi,
+    żeby przeglądarka traktowała strumień jak zwykłe multimedia (A2DP).
+    Echo eliminujemy programowo (tryb mikrofonu "Auto‑wyciszanie"/duplex).
+    Patch MUSI być przed /vendor/lib.iife.js, aby ewentualna referencja zapamiętana
+    przez LiveKit przy starcie wskazywała już na naszą wersję.
+  -->
+  <script>
+    (function () {
+      var md = navigator.mediaDevices;
+      if (!md || !md.getUserMedia) return;
+      window.__forceMediaProfile = true; // domyślnie ON (głośnik Bluetooth); zarządzane z app.js
+      var orig = md.getUserMedia.bind(md);
+      md.getUserMedia = function (constraints) {
+        try {
+          if (window.__forceMediaProfile && constraints && constraints.audio) {
+            var a =
+              typeof constraints.audio === "object"
+                ? Object.assign({}, constraints.audio)
+                : {};
+            a.echoCancellation = false;
+            a.noiseSuppression = false;
+            a.autoGainControl = false;
+            constraints = Object.assign({}, constraints, { audio: a });
+          }
+        } catch (e) {
+          /* w razie czego wołamy oryginał z oryginalnymi ograniczeniami */
+        }
+        return orig(constraints);
+      };
+    })();
+  </script>
+
   <!-- Oficjalny SDK ElevenLabs (WebRTC), serwowany lokalnie z node_modules przez backend.
        Po załadowaniu wystawia globalny obiekt window.ElevenLabsClient. -->
   <script src="/vendor/lib.iife.js" defer></script>
@@ -47,11 +87,18 @@
         <div id="spkHint" class="hint hidden"></div>
       </div>
 
-      <div class="badges" title="Te flagi getUserMedia są wymuszane przez SDK na ścieżce WebRTC.">
-        <span class="badge">✓ Echo cancellation</span>
-        <span class="badge">✓ Noise suppression</span>
-        <span class="badge">✓ Auto gain control</span>
-      </div>
+      <label class="switch-field" for="btMode">
+        <span class="switch-text">
+          🔵 Tryb Bluetooth (A2DP)
+          <small>Wyłącza systemową redukcję echa, aby dźwięk trafił na głośnik Bluetooth (jak w YouTube). Zalecane razem z trybem „Auto‑wyciszanie”.</small>
+        </span>
+        <span class="switch">
+          <input type="checkbox" id="btMode" checked />
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </span>
+      </label>
+
+      <div class="badges" id="audioBadges"></div>
     </section>
 
     <!-- Tryb mikrofonu / ochrona przed sprzężeniem -->

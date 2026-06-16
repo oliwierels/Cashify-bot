@@ -13,16 +13,12 @@
 
 // --- Stałe ------------------------------------------------------------------
 
-// Rygorystyczne flagi audio (używane przy przyznawaniu uprawnień/enumeracji;
-// SDK stosuje identyczne na realnym torze mikrofonu WebRTC).
-const STRICT_AUDIO = {
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-};
+// UWAGA: flagi echoCancellation/noiseSuppression/autoGainControl NIE są już
+// ustawiane tutaj. Reguluje je globalny patch getUserMedia z <head> w index.html,
+// sterowany przez window.__forceMediaProfile (tryb Bluetooth/A2DP).
 
 const MODE_NOTES = {
-  open: "Mikrofon zawsze aktywny — polegamy na redukcji echa (sprzętowej i programowej).",
+  open: "Mikrofon zawsze aktywny. UWAGA: w trybie Bluetooth (bez systemowej redukcji echa) grozi sprzężeniem — użyj „Auto‑wyciszanie”.",
   duplex:
     "Mikrofon jest automatycznie wyciszany, gdy bot mówi. Najlepsza ochrona przed sprzężeniem przy głośniku Bluetooth.",
   ptt: "Mikrofon wyciszony. Przytrzymaj przycisk (lub spację), aby mówić.",
@@ -56,6 +52,8 @@ const toggleBtn = $("toggleBtn");
 const ctxForm = $("ctxForm");
 const ctxInput = $("ctxInput");
 const logEl = $("log");
+const btMode = $("btMode");
+const audioBadges = $("audioBadges");
 
 // --- Stan -------------------------------------------------------------------
 
@@ -78,6 +76,30 @@ function setSpkHint(text, warn = false) {
   spkHint.textContent = text;
   spkHint.classList.remove("hidden");
   spkHint.classList.toggle("warn", warn);
+}
+
+// Pokazuje aktualny profil audio w zależności od trybu Bluetooth (A2DP) vs VoIP.
+function renderAudioBadges() {
+  if (!audioBadges) return;
+  const bt = !!window.__forceMediaProfile;
+  audioBadges.innerHTML = "";
+  const make = (text, cls) => {
+    const s = document.createElement("span");
+    s.className = "badge" + (cls ? " " + cls : "");
+    s.textContent = text;
+    audioBadges.appendChild(s);
+  };
+  if (bt) {
+    make("🔵 Profil: Multimedia / A2DP", "accent");
+    make("✕ Echo cancellation", "off");
+    make("✕ Noise suppression", "off");
+    make("Echo eliminuje „Auto‑wyciszanie”");
+  } else {
+    make("📞 Profil: Komunikacja (VoIP)", "off");
+    make("✓ Echo cancellation");
+    make("✓ Noise suppression");
+    make("✓ Auto gain control");
+  }
 }
 
 function addLog(who, text) {
@@ -184,7 +206,9 @@ async function ensurePermissionAndRefresh() {
     return;
   }
   try {
-    const s = await navigator.mediaDevices.getUserMedia({ audio: STRICT_AUDIO });
+    // Flagi audio (echoCancellation itd.) ustawia globalny patch z <head>
+    // w zależności od trybu Bluetooth — tu prosimy tylko o dostęp do mikrofonu.
+    const s = await navigator.mediaDevices.getUserMedia({ audio: true });
     s.getTracks().forEach((t) => t.stop());
   } catch (e) {
     console.warn("getUserMedia:", e);
@@ -371,6 +395,19 @@ document.querySelectorAll('input[name="micmode"]').forEach((r) => {
   });
 });
 
+// Tryb Bluetooth (A2DP): wyłącza systemową redukcję echa (echoCancellation itd.),
+// dzięki czemu Android nie przełącza sesji w tryb VoIP i dźwięk trafia na głośnik BT.
+if (btMode) {
+  btMode.addEventListener("change", () => {
+    window.__forceMediaProfile = btMode.checked;
+    renderAudioBadges();
+    if (connected) {
+      // Track mikrofonu już istnieje — nowy profil zadziała przy następnym połączeniu.
+      setStatus("Tryb Bluetooth zmieni się po ponownym połączeniu", "connected");
+    }
+  });
+}
+
 // Push‑to‑Talk: wciśnięcie = mów, puszczenie = cisza.
 pttBtn.addEventListener("pointerdown", (e) => {
   e.preventDefault();
@@ -434,12 +471,22 @@ function init() {
   if (!window.isSecureContext || !navigator.mediaDevices) {
     secureWarning.classList.remove("hidden");
   }
+
+  // Zsynchronizuj tryb Bluetooth (A2DP) z przełącznikiem i pokaż aktualny profil audio.
+  window.__forceMediaProfile = btMode ? btMode.checked : true;
+  renderAudioBadges();
+
   if (!outputSelectionSupported) {
     spkSelect.disabled = true;
     setSpkHint(
       "Twoja przeglądarka nie pozwala wybrać wyjścia z poziomu strony — system (np. Bluetooth) wybiera je automatycznie."
     );
+  } else if (window.__forceMediaProfile) {
+    setSpkHint(
+      "W trybie Bluetooth zostaw „Domyślny (system)” — Android sam skieruje dźwięk na głośnik Bluetooth (A2DP)."
+    );
   }
+
   updateMicModeUI();
   // Wstępna enumeracja (etykiety mogą być puste do czasu przyznania uprawnień).
   refreshDevices();
