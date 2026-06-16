@@ -1,6 +1,16 @@
+# Dependencies
+node_modules/
+
+# Env / secrets
 .env
-__pycache__/
-*.pyc
-*.pyo
-venv/
-.venv/
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

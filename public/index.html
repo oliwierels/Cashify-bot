@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>CashiBot — asystent głosowy</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <!-- Oficjalny SDK ElevenLabs (WebRTC), serwowany lokalnie z node_modules przez backend.
+       Po załadowaniu wystawia globalny obiekt window.ElevenLabsClient. -->
+  <script src="/vendor/lib.iife.js" defer></script>
+  <script src="/app.js" type="module" defer></script>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>CashiBot</h1>
+      <p>Rozmowa głosowa z agentem AI w czasie rzeczywistym (WebRTC). Wybierz mikrofon i głośnik, a następnie naciśnij „Start”.</p>
+    </header>
+
+    <div id="secureWarning" class="banner hidden">
+      ⚠️ Ta strona wymaga bezpiecznego połączenia (HTTPS) oraz dostępu do mikrofonu.
+      Otwórz aplikację przez adres https:// (Railway zapewnia HTTPS automatycznie).
+    </div>
+
+    <!-- Status -->
+    <div class="status-bar">
+      <span id="statusPill" class="pill"><span class="dot"></span><span id="statusText">Gotowy</span></span>
+      <span id="modePill" class="pill mode-pill hidden">👂 Słucha</span>
+    </div>
+
+    <!-- Wybór urządzeń audio -->
+    <section class="card">
+      <h2>Urządzenia audio</h2>
+
+      <div class="field">
+        <label for="micSelect">🎙️ Mikrofon (wejście) — np. DJI Mic</label>
+        <div class="row">
+          <select id="micSelect"><option value="">Domyślny (system)</option></select>
+          <button id="refreshBtn" class="icon-btn" title="Zezwól na mikrofon / odśwież listę">🔄</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="spkSelect">🔊 Głośnik (wyjście) — np. głośnik Bluetooth</label>
+        <select id="spkSelect"><option value="">Domyślny (system)</option></select>
+        <div id="spkHint" class="hint hidden"></div>
+      </div>
+
+      <div class="badges" title="Te flagi getUserMedia są wymuszane przez SDK na ścieżce WebRTC.">
+        <span class="badge">✓ Echo cancellation</span>
+        <span class="badge">✓ Noise suppression</span>
+        <span class="badge">✓ Auto gain control</span>
+      </div>
+    </section>
+
+    <!-- Tryb mikrofonu / ochrona przed sprzężeniem -->
+    <section class="card">
+      <h2>Mikrofon &amp; ochrona przed sprzężeniem</h2>
+      <div class="segmented" id="micMode">
+        <input type="radio" name="micmode" id="modeOpen" value="open" />
+        <label for="modeOpen">Otwarty<br />mikrofon</label>
+        <input type="radio" name="micmode" id="modeDuplex" value="duplex" checked />
+        <label for="modeDuplex">Auto‑wyciszanie<br />(zalecane)</label>
+        <input type="radio" name="micmode" id="modePtt" value="ptt" />
+        <label for="modePtt">Push&#8209;to&#8209;Talk</label>
+      </div>
+      <div id="modeNote" class="seg-note"></div>
+
+      <button id="pttBtn" class="btn hidden">🎤 Przytrzymaj, aby mówić</button>
+
+      <div class="mic-controls">
+        <button id="muteBtn" class="btn secondary" disabled>🎤 Wycisz mikrofon</button>
+      </div>
+    </section>
+
+    <!-- Głośność + poziomy -->
+    <section class="card">
+      <h2>Dźwięk</h2>
+      <div class="slider-row">
+        <span>Głośność bota</span>
+        <input id="volume" type="range" min="0" max="100" value="100" />
+        <span id="volumeVal">100%</span>
+      </div>
+
+      <div class="meter">
+        <div class="meter-label"><span>Poziom mikrofonu</span><span id="micState">—</span></div>
+        <div class="meter-track"><div id="micMeterFill" class="meter-fill"></div></div>
+      </div>
+      <div class="meter">
+        <div class="meter-label"><span>Poziom bota</span></div>
+        <div class="meter-track"><div id="botMeterFill" class="meter-fill"></div></div>
+      </div>
+    </section>
+
+    <!-- Główny przycisk -->
+    <button id="toggleBtn" class="btn">▶︎ Start rozmowy</button>
+
+    <!-- Kontekst na żywo (opcjonalnie) -->
+    <section class="card">
+      <h2>Kontekst na żywo</h2>
+      <form id="ctxForm" class="row">
+        <input id="ctxInput" type="text" placeholder="Co bot ma wkomponować w rozmowę…" autocomplete="off" />
+        <button type="submit" class="icon-btn" title="Wyślij kontekst">➤</button>
+      </form>
+      <div class="hint">Tekst trafia do agenta jako kontekst (nie przerywa wypowiedzi).</div>
+    </section>
+
+    <!-- Transkrypcja -->
+    <section class="card">
+      <h2>Transkrypcja</h2>
+      <div id="log"></div>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "cashibot-webrtc",
+  "version": "1.0.0",
+  "description": "Conversational AI voice agent powered by ElevenLabs over WebRTC. The Node/Express backend only mints short-lived session tokens (the API key never reaches the browser); the static frontend connects to the agent via the official ElevenLabs WebRTC SDK.",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo \"No build step needed — static frontend is served from public/\"",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "elevenlabs",
+    "conversational-ai",
+    "webrtc",
+    "voice-agent",
+    "railway"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@elevenlabs/client": "^1.11.1",
+    "@elevenlabs/elevenlabs-js": "^2.53.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1"
+  }
+}
