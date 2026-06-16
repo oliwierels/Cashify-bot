@@ -70,6 +70,74 @@
     }
     .volume-row.visible { display: flex; }
     .volume-row input[type="range"] { flex: 1; }
+    .mic-settings {
+      width: 100%;
+      max-width: 480px;
+      background: #18181b;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 0.88rem;
+      color: #a1a1aa;
+    }
+    .mic-settings summary {
+      cursor: pointer;
+      color: #d4d4d8;
+      font-weight: 600;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .mic-settings summary::before { content: "⚙️"; }
+    .mic-settings-body {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .mic-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .mic-row span { flex: 1; }
+    .toggle-switch {
+      position: relative;
+      width: 42px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-switch .slider {
+      position: absolute;
+      inset: 0;
+      background: #3f3f46;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-switch .slider::before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      top: 3px;
+      left: 3px;
+      transition: transform 0.2s;
+    }
+    .toggle-switch input:checked + .slider { background: #6366f1; }
+    .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+    .gain-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .gain-row span:first-child { flex: 1; }
+    .gain-row input[type="range"] { flex: 1.5; }
+    .gain-row span:last-child { min-width: 36px; text-align: right; }
     #muteBtn {
       display: none;
       font-size: 1.1rem;
@@ -107,6 +175,38 @@
     <button id="muteBtn">🎤 Mikrofon włączony</button>
     <div id="status">Gotowy</div>
 
+    <details class="mic-settings" id="micSettings">
+      <summary>Ustawienia mikrofonu</summary>
+      <div class="mic-settings-body">
+        <div class="gain-row">
+          <span>Czułość mikrofonu</span>
+          <input id="micGain" type="range" min="0.1" max="3" step="0.05" value="1">
+          <span id="micGainValue">1.0×</span>
+        </div>
+        <div class="mic-row">
+          <span>Redukcja szumów</span>
+          <label class="toggle-switch">
+            <input id="noiseSupp" type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="mic-row">
+          <span>Redukcja echa</span>
+          <label class="toggle-switch">
+            <input id="echoCanc" type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+        <div class="mic-row">
+          <span>Automatyczna głośność (AGC)</span>
+          <label class="toggle-switch">
+            <input id="autoGain" type="checkbox" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </details>
+
     <div id="volumeRow" class="volume-row">
       <span>Glosnosc bota</span>
       <input id="volumeSlider" type="range" min="0" max="100" value="100">
@@ -133,9 +233,17 @@
     const volumeSlider = document.getElementById("volumeSlider");
     const volumeValue = document.getElementById("volumeValue");
     const muteBtn = document.getElementById("muteBtn");
+    const micGainSlider = document.getElementById("micGain");
+    const micGainValue = document.getElementById("micGainValue");
+    const noiseSupp = document.getElementById("noiseSupp");
+    const echoCanc = document.getElementById("echoCanc");
+    const autoGain = document.getElementById("autoGain");
 
     let conversation = null;
     let micStream = null;
+    let processedStream = null;
+    let audioCtx = null;
+    let gainNode = null;
     let micMuted = false;
 
     function setStatus(text) {
@@ -157,17 +265,33 @@
       return data.signedUrl;
     }
 
+    micGainSlider.addEventListener("input", () => {
+      const v = parseFloat(micGainSlider.value);
+      micGainValue.textContent = v.toFixed(2) + "×";
+      if (gainNode) gainNode.gain.value = v;
+    });
+
     async function startConversation() {
       toggleBtn.disabled = true;
       setStatus("Laczenie...");
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
           audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
+            echoCancellation: echoCanc.checked,
+            noiseSuppression: noiseSupp.checked,
+            autoGainControl: autoGain.checked,
           },
         });
+
+        audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        gainNode = audioCtx.createGain();
+        gainNode.gain.value = parseFloat(micGainSlider.value);
+        const dest = audioCtx.createMediaStreamDestination();
+        source.connect(gainNode);
+        gainNode.connect(dest);
+        processedStream = dest.stream;
+
         const signedUrl = await fetchSignedUrl();
 
         conversation = await Conversation.startSession({
@@ -193,6 +317,9 @@
             muteBtn.textContent = "🎤 Mikrofon włączony";
             micMuted = false;
             if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+            if (audioCtx) { audioCtx.close(); audioCtx = null; }
+            gainNode = null;
+            processedStream = null;
             conversation = null;
           },
           onError: (err) => {
@@ -249,6 +376,14 @@
       micStream.getAudioTracks().forEach(t => { t.enabled = !micMuted; });
       muteBtn.textContent = micMuted ? "🔇 Mikrofon wyłączony" : "🎤 Mikrofon włączony";
       muteBtn.classList.toggle("muted", micMuted);
+    });
+
+    [noiseSupp, echoCanc, autoGain].forEach(toggle => {
+      toggle.addEventListener("change", () => {
+        if (conversation) {
+          setStatus("Zmień ustawienia przed następną rozmową");
+        }
+      });
     });
   </script>
 </body>
