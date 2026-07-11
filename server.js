@@ -19,6 +19,14 @@ import express from "express";
 import cors from "cors";
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 
+// Zapobiegaj crashowi procesu z powodu niezłapanych błędów asynchronicznych.
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught exception — serwer kontynuuje działanie:", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled promise rejection — serwer kontynuuje działanie:", reason);
+});
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
@@ -96,7 +104,21 @@ app.get(/^(?!\/api\/|\/vendor\/).*/, (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`CashiBot (WebRTC) nasłuchuje na porcie ${PORT}`);
   console.log(`Agent ID: ${AGENT_ID.slice(0, 10)}…`);
+  console.log(`Start: ${new Date().toISOString()}`);
 });
+
+// Graceful shutdown przy sygnałach Railway/Docker (SIGTERM) i Ctrl+C (SIGINT).
+function shutdown(signal) {
+  console.log(`[${signal}] Zamykam serwer…`);
+  server.close(() => {
+    console.log("Serwer zamknięty.");
+    process.exit(0);
+  });
+  // Wymuszony exit po 10 s, jeśli połączenia nie zakończą się same.
+  setTimeout(() => process.exit(1), 10_000).unref();
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
