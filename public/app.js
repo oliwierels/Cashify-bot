@@ -30,6 +30,12 @@ const outputSelectionSupported =
   typeof HTMLMediaElement !== "undefined" &&
   "setSinkId" in HTMLMediaElement.prototype;
 
+// iPhone/iPad (także Chrome na iOS — ten sam silnik WebKit). iPadOS przedstawia się jak Mac,
+// więc rozpoznajemy go po ekranie dotykowym.
+const isIOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 // Kod dostępu (gdy serwer ma ustawione ACCESS_CODE) — zapamiętywany na urządzeniu.
 const ACCESS_CODE_KEY = "cashibot.accessCode";
 
@@ -94,6 +100,14 @@ function renderAudioBadges() {
     s.textContent = text;
     audioBadges.appendChild(s);
   };
+  if (isIOS) {
+    // WebKit przy aktywnym mikrofonie zawsze ustawia sesję audio iOS w tryb rozmowy
+    // (PlayAndRecord + VideoChat), niezależnie od flag getUserMedia — profilu A2DP
+    // nie da się wymusić ze strony.
+    make("🍎 iOS: tryb rozmowy — wyjście wybiera system", "off");
+    make(bt ? "✕ Echo cancellation" : "✓ Echo cancellation", bt ? "off" : "");
+    return;
+  }
   if (bt) {
     make("🔵 Profil: Multimedia / A2DP", "accent");
     make("✕ Echo cancellation", "off");
@@ -535,7 +549,15 @@ function init() {
   window.__forceMediaProfile = btMode ? btMode.checked : true;
   renderAudioBadges();
 
-  if (!outputSelectionSupported) {
+  if (isIOS) {
+    spkSelect.disabled = !outputSelectionSupported;
+    setSpkHint(
+      "iPhone: gdy strona używa mikrofonu, iOS przełącza dźwięk w tryb rozmowy i może grać przez głośnik telefonu zamiast przez głośnik Bluetooth. Strona nie może tego zmienić — na stoisko z głośnikiem BT użyj Androida albo komputera.",
+      true
+    );
+    const btNote = btMode?.closest(".switch-field")?.querySelector("small");
+    if (btNote) btNote.textContent = "Działa tylko na Androidzie. Na iPhonie nie wpływa na wybór głośnika.";
+  } else if (!outputSelectionSupported) {
     spkSelect.disabled = true;
     setSpkHint(
       "Twoja przeglądarka nie pozwala wybrać wyjścia z poziomu strony — system (np. Bluetooth) wybiera je automatycznie."

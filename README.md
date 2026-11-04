@@ -121,6 +121,12 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 - Etykiety urządzeń pojawiają się dopiero po przyznaniu uprawnień do mikrofonu — użyj
   przycisku 🔄, aby udzielić zgody i odświeżyć listę.
 - Lista odświeża się automatycznie przy podłączeniu/odłączeniu sprzętu (`devicechange`).
+- **iPhone / iPad + głośnik Bluetooth:** każda przeglądarka na iOS (także Chrome) działa na
+  silniku WebKit, który przy aktywnym mikrofonie ustawia sesję audio iOS w tryb rozmowy
+  (`PlayAndRecord` + `VideoChat`) — niezależnie od flag `getUserMedia`. Trik z Androida
+  (wyłączenie redukcji echa) nic tu nie zmienia, a strona nie ma API do zmiany tych ustawień.
+  W praktyce dźwięk bota potrafi przejść z głośnika BT na głośnik telefonu (Spotify działa,
+  bo nie używa mikrofonu). Na stoisko z głośnikiem BT używaj Androida albo komputera.
 
 ## Struktura projektu
 
