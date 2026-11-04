@@ -11,7 +11,7 @@ sprzężeniem zwrotnym (echo/zapętlanie). Gotowa do wdrożenia na **Railway** (
 │  Przeglądarka (public/)  │         │  Node/Express (server.js)     │
 │                          │  GET    │                                │
 │  ElevenLabs WebRTC SDK   │ ──────▶ │  /api/webrtc-token             │
-│  (window.ElevenLabsClient)│ token  │   → getWebrtcToken(agentId)    │
+│  (window.ElevenLabsClient)│ token  │   → token z API ElevenLabs     │
 │                          │ ◀────── │   (klucz API tylko na serwerze)│
 └───────────┬──────────────┘         └──────────────────────────────┘
             │ WebRTC (audio) — bezpośrednio do ElevenLabs/LiveKit
@@ -25,14 +25,16 @@ sprzężeniem zwrotnym (echo/zapętlanie). Gotowa do wdrożenia na **Railway** (
   Sam dźwięk WebRTC płynie bezpośrednio między przeglądarką a ElevenLabs (niskie opóźnienia).
 - **SDK przeglądarkowy** jest serwowany lokalnie z `node_modules` pod `/vendor/lib.iife.js`
   — brak zależności od zewnętrznego CDN i brak kroku budowania frontendu.
+- **PWA** — aplikację można zainstalować na ekranie głównym telefonu (ikona, pełny ekran,
+  bez paska adresu). Zobacz [Instalacja na telefonie](#instalacja-na-telefonie-pwa).
 
 ## Ochrona przed sprzężeniem (echo/zapętlanie)
 
 1. **Wymuszone flagi audio** na torze WebRTC: `echoCancellation`, `noiseSuppression`,
    `autoGainControl` (SDK ustawia je na `true` przy tworzeniu tracka mikrofonu).
-2. **Jawny wybór urządzeń** wejścia (DJI) i wyjścia (głośnik BT) — aplikowany po połączeniu
-   przez `changeInputDevice` / `changeOutputDevice`, co dodatkowo potwierdza powyższe flagi
-   na konkretnym sprzęcie.
+2. **Jawny wybór urządzeń** wejścia (DJI) i wyjścia (głośnik BT) — mikrofon jest przekazywany
+   do `startSession` i publikowany od pierwszej chwili (SDK ≥ 1.22), a głośnik aplikowany po
+   połączeniu przez `changeOutputDevice`. Odłączony mikrofon → automatyczny powrót do domyślnego.
 3. **Trzy tryby mikrofonu** (przełącznik w UI):
    - **Otwarty mikrofon** — pełny duplex, polega na redukcji echa.
    - **Auto‑wyciszanie (zalecane)** — mikrofon jest automatycznie wyciszany, gdy bot mówi.
@@ -44,7 +46,7 @@ sprzężeniem zwrotnym (echo/zapętlanie). Gotowa do wdrożenia na **Railway** (
 
 ## Wymagania
 
-- Node.js ≥ 18 (zalecane 20+).
+- Node.js 22 (ustawione w `package.json` → `engines`; Railway wybiera tę wersję automatycznie).
 - Konto ElevenLabs z agentem Conversational AI (`agent_…`) oraz klucz API.
 
 ## Konfiguracja (zmienne środowiskowe)
@@ -69,6 +71,19 @@ npm start
 
 > `getUserMedia` i wybór urządzeń wymagają **bezpiecznego kontekstu**: `http://localhost`
 > działa w dev, a w sieci/produkcji wymagane jest **HTTPS** (Railway zapewnia je automatycznie).
+
+## Instalacja na telefonie (PWA)
+
+Po otwarciu publicznego adresu HTTPS:
+
+- **Android (Chrome):** menu ⋮ → **Zainstaluj aplikację** / **Dodaj do ekranu głównego**.
+- **iOS 26 (Safari):** przycisk **⋯** obok paska adresu → **Udostępnij** → przewiń w dół →
+  **Do ekranu początkowego** → zostaw włączone „Otwórz jako aplikację” (*Open as Web App*) →
+  **Dodaj**.
+
+Aplikacja uruchamia się wtedy z ikony, na pełnym ekranie. Service worker (`public/sw.js`)
+działa w trybie *network-first*: zawsze pobiera najnowszą wersję po wdrożeniu, a cache służy
+tylko do szybkiego otwarcia, gdy brak sieci. Żądania `/api/*` nigdy nie są cache'owane.
 
 ## Wdrożenie na Railway (Nixpacks)
 
@@ -106,16 +121,15 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 - Etykiety urządzeń pojawiają się dopiero po przyznaniu uprawnień do mikrofonu — użyj
   przycisku 🔄, aby udzielić zgody i odświeżyć listę.
 - Lista odświeża się automatycznie przy podłączeniu/odłączeniu sprzętu (`devicechange`).
-
-## Struktura projektu
-
-```
-.
-├── server.js            # Backend: token WebRTC + serwowanie statyków i SDK
-├── package.json         # Skrypty (start/build) i zależności
-├── .env.example         # Wzór konfiguracji
-└── public/
-    ├── index.html       # UI
-    ├── styles.css       # Style
-    └── app.js           # Logika: WebRTC, wybór urządzeń, tryby mikrofonu, mierniki
-```
+- **iPhone / iPad + głośnik Bluetooth:** każda przeglądarka na iOS (także Chrome) działa na
+  silniku WebKit, który przy aktywnym mikrofonie ustawia sesję audio iOS w tryb rozmowy
+  (`PlayAndRecord` + `VideoChat`, opcje Bluetooth HFP + A2DP + `DefaultToSpeaker`) —
+  niezależnie od flag `getUserMedia`, więc trik z Androida (wyłączenie redukcji echa) nic tu
+  nie zmienia, a głośnik wybiera iOS. Ta logika jest identyczna w całej linii iOS 26.x.
+  W iOS 27 WebKit zmienia przy mikrofonie politykę trasy na `LongFormAudio`
+  (`MediaSessionManagerCocoa.mm`) — po aktualizacji do iOS 27 przetestuj głośnik BT przed
+  wydarzeniem.
+- **iPhone gra z telefonu zamiast z głośnika BT (także na stronach testowych WebRTC, np.
+  webrtc.github.io/samples → peerconnection/audio)?** To stan iOS, nie aplikacji — pomógł
+  restart iPhone'a (czasem dopiero kolejny). Przed wydarzeniem: połącz głośnik, uruchom krótką
+  rozmowę i sprawdź, skąd leci dźwięk; Android jako zapas.

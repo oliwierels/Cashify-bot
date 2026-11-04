@@ -28,6 +28,11 @@ html, body {
   max-width: 560px;
   margin: 0 auto;
   padding: 22px 18px 48px;
+  /* Zainstalowana PWA (iOS: pasek statusu „black-translucent”) — omijamy wycięcia ekranu. */
+  padding-top: calc(22px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(18px, env(safe-area-inset-left, 0px));
+  padding-right: max(18px, env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
   gap: 16px;

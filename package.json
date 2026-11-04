@@ -4,7 +4,7 @@
   "description": "Conversational AI voice agent powered by ElevenLabs over WebRTC. The Node/Express backend only mints short-lived session tokens (the API key never reaches the browser); the static frontend connects to the agent via the official ElevenLabs WebRTC SDK.",
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node server.js",
@@ -20,10 +20,9 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@elevenlabs/client": "^1.11.1",
-    "@elevenlabs/elevenlabs-js": "^2.53.0",
+    "@elevenlabs/client": "^1.32.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.3.0"
   }
 }

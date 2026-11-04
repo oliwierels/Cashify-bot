@@ -4,9 +4,10 @@
  * Założenia anty‑sprzężeniowe:
  *  - getUserMedia / track mikrofonu jest tworzony przez SDK z wymuszonymi flagami
  *    { echoCancellation, noiseSuppression, autoGainControl } = true (ścieżka WebRTC).
- *  - Wybór konkretnego mikrofonu (DJI) i głośnika (Bluetooth) aplikujemy PO połączeniu
- *    przez changeInputDevice/changeOutputDevice — na ścieżce WebRTC SDK nie honoruje
- *    inputDeviceId/outputDeviceId w momencie startu.
+ *  - Mikrofon (DJI) przekazujemy w startSession — od SDK 1.22 jest publikowany od
+ *    pierwszej chwili (wcześniej SDK startował z domyślnego mikrofonu telefonu).
+ *    Głośnik (Bluetooth) aplikujemy PO połączeniu przez changeOutputDevice — na ścieżce
+ *    WebRTC SDK nie honoruje outputDeviceId w momencie startu.
  *  - Trzy tryby mikrofonu (Otwarty / Auto‑wyciszanie / Push‑to‑Talk) jako warstwy
  *    obrony przed echem, gdyby sprzętowa redukcja głośnika BT zawiodła.
  */
@@ -28,6 +29,13 @@ const MODE_NOTES = {
 const outputSelectionSupported =
   typeof HTMLMediaElement !== "undefined" &&
   "setSinkId" in HTMLMediaElement.prototype;
+
+// iPhone/iPad (także Chrome na iOS — ten sam silnik WebKit). iPadOS przedstawia się jak Mac,
+// więc rozpoznajemy go po ekranie dotykowym.
+const isIOS =
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 
 // --- Referencje do elementów ------------------------------------------------
 
@@ -89,6 +97,14 @@ function renderAudioBadges() {
     s.textContent = text;
     audioBadges.appendChild(s);
   };
+  if (isIOS) {
+    // WebKit przy aktywnym mikrofonie zawsze ustawia sesję audio iOS w tryb rozmowy
+    // (PlayAndRecord + VideoChat), niezależnie od flag getUserMedia — profilu A2DP
+    // nie da się wymusić ze strony — głośnik wybiera iOS.
+    make("🍎 iOS: tryb rozmowy — wyjście wybiera system", "off");
+    make(bt ? "✕ Echo cancellation" : "✓ Echo cancellation", bt ? "off" : "");
+    return;
+  }
   if (bt) {
     make("🔵 Profil: Multimedia / A2DP", "accent");
     make("✕ Echo cancellation", "off");
@@ -140,6 +156,14 @@ function applyMute() {
 function updateMicModeUI() {
   pttBtn.classList.toggle("hidden", micMode !== "ptt");
   modeNote.textContent = MODE_NOTES[micMode] || "";
+}
+
+// Pobiera krótkożyciowy token sesji WebRTC (klucz API zostaje na serwerze).
+async function fetchToken() {
+  const res = await fetch("/api/webrtc-token", { cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.token) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.token;
 }
 
 // Czeka aż globalny obiekt SDK (window.ElevenLabsClient) będzie dostępny.
@@ -199,6 +223,22 @@ async function refreshDevices() {
   }
 }
 
+// Wybrany mikrofon mógł zostać odłączony — start z nieistniejącym urządzeniem by się
+// nie powiódł, więc wracamy wtedy do domyślnego.
+async function resolveInputDeviceId() {
+  const id = micSelect.value;
+  if (!id || !navigator.mediaDevices?.enumerateDevices) return undefined;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    if (devices.some((d) => d.kind === "audioinput" && d.deviceId === id)) return id;
+  } catch {
+    return id;
+  }
+  console.warn("Wybrany mikrofon jest niedostępny — używam domyślnego.");
+  micSelect.value = "";
+  return undefined;
+}
+
 // Wymusza prompt o mikrofon (żeby pojawiły się etykiety urządzeń), potem odświeża listę.
 async function ensurePermissionAndRefresh() {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -222,33 +262,30 @@ async function ensurePermissionAndRefresh() {
 // --- Sesja rozmowy ----------------------------------------------------------
 
 async function start() {
+  // Blokada od razu — podwójne kliknięcie nie może otworzyć dwóch sesji.
+  toggleBtn.disabled = true;
   const Conversation = await whenSdkReady();
   if (!Conversation) {
     setStatus("Błąd: nie udało się załadować SDK ElevenLabs", "error");
+    toggleBtn.disabled = false;
     return;
   }
 
-  toggleBtn.disabled = true;
   setStatus("Łączenie…", "connecting");
 
-  const inputDeviceId = micSelect.value || undefined;
+  const inputDeviceId = await resolveInputDeviceId();
   const outputDeviceId =
     outputSelectionSupported && spkSelect.value ? spkSelect.value : undefined;
 
+  let conv = null;
   try {
-    // 1) Pobierz krótkożyciowy token sesji WebRTC z backendu (klucz API zostaje na serwerze).
-    const res = await fetch("/api/webrtc-token", { cache: "no-store" });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(e.error || `HTTP ${res.status}`);
-    }
-    const { token } = await res.json();
+    // 1) Pobierz krótkożyciowy token sesji WebRTC z backendu.
+    const token = await fetchToken();
 
-    // 2) Nawiąż sesję WebRTC.
-    conversation = await Conversation.startSession({
+    // 2) Nawiąż sesję WebRTC (mikrofon publikowany od razu z wybranego urządzenia).
+    conv = await Conversation.startSession({
       connectionType: "webrtc",
       conversationToken: token,
-      // Przekazane dla kompletności (na ścieżce WebRTC i tak aplikujemy je jawnie poniżej).
       inputDeviceId,
       outputDeviceId,
 
@@ -273,26 +310,23 @@ async function start() {
       },
       onDisconnect: () => cleanup(),
     });
+    conversation = conv;
 
     // 3) startSession rozwiązuje się dopiero po nawiązaniu połączenia (isConnected=true),
-    //    więc bezpiecznie aplikujemy wybrane urządzenia teraz.
+    //    więc bezpiecznie aplikujemy wybrane wyjście teraz.
     if (outputDeviceId) {
       try {
-        await conversation.changeOutputDevice({ outputDeviceId });
+        await conv.changeOutputDevice({ outputDeviceId });
       } catch (e) {
         console.warn("changeOutputDevice:", e);
         setSpkHint("Nie udało się przełączyć wyjścia — używam domyślnego.", true);
       }
     }
-    if (inputDeviceId) {
-      try {
-        await conversation.changeInputDevice({ inputDeviceId });
-      } catch (e) {
-        console.warn("changeInputDevice:", e);
-      }
-    }
 
-    conversation.setVolume({ volume: Number(volume.value) / 100 });
+    // Sesja mogła się zakończyć w trakcie konfiguracji (onDisconnect -> cleanup()).
+    if (conversation !== conv) return;
+
+    conv.setVolume({ volume: Number(volume.value) / 100 });
     applyMute();
     startMeters();
 
@@ -307,6 +341,8 @@ async function start() {
     console.error(err);
     setStatus("Błąd: " + (err?.message || err), "error");
     conversation = null;
+    // Nie zostawiaj otwartej sesji (i włączonego mikrofonu), jeśli błąd wystąpił po połączeniu.
+    if (conv) conv.endSession().catch(() => {});
     toggleBtn.disabled = false;
   }
 }
@@ -476,7 +512,14 @@ function init() {
   window.__forceMediaProfile = btMode ? btMode.checked : true;
   renderAudioBadges();
 
-  if (!outputSelectionSupported) {
+  if (isIOS) {
+    spkSelect.disabled = !outputSelectionSupported;
+    setSpkHint(
+      "iPhone: głośnik wybiera iOS — strona nie może go wskazać. Połącz głośnik Bluetooth przed startem rozmowy. Jeśli bot mimo to gra z telefonu, zrestartuj iPhone'a (iOS potrafi „zawiesić” trasę dźwięku dla wszystkich stron z mikrofonem)."
+    );
+    const btNote = btMode?.closest(".switch-field")?.querySelector("small");
+    if (btNote) btNote.textContent = "Poprawka dla Androida. Na iPhonie trasę dźwięku wybiera iOS.";
+  } else if (!outputSelectionSupported) {
     spkSelect.disabled = true;
     setSpkHint(
       "Twoja przeglądarka nie pozwala wybrać wyjścia z poziomu strony — system (np. Bluetooth) wybiera je automatycznie."
@@ -488,6 +531,12 @@ function init() {
   }
 
   updateMicModeUI();
+
+  // PWA: service worker (instalacja na ekranie głównym, szybsze otwieranie).
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("serviceWorker:", e));
+  }
+
   // Wstępna enumeracja (etykiety mogą być puste do czasu przyznania uprawnień).
   refreshDevices();
   navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
