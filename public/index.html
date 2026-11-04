@@ -79,9 +79,12 @@
       <span id="modePill" class="pill mode-pill hidden">👂 Słucha</span>
     </div>
 
-    <!-- Wybór urządzeń audio -->
-    <section class="card">
-      <h2>Urządzenia audio</h2>
+    <!-- Wybór urządzeń audio (zwijane — domyślnie zwinięte, żeby „Start” był bliżej góry) -->
+    <details class="card collapsible" id="devicesCard">
+      <summary>
+        <h2>Urządzenia audio</h2>
+        <span id="devicesSummary" class="summary-text"></span>
+      </summary>
 
       <div class="field">
         <label for="micSelect">🎙️ Mikrofon (wejście) — np. DJI Mic</label>
@@ -109,7 +112,7 @@
       </label>
 
       <div class="badges" id="audioBadges"></div>
-    </section>
+    </details>
 
     <!-- Tryb mikrofonu / ochrona przed sprzężeniem -->
     <section class="card">

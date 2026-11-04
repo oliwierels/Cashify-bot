@@ -30,6 +30,9 @@ const outputSelectionSupported =
   typeof HTMLMediaElement !== "undefined" &&
   "setSinkId" in HTMLMediaElement.prototype;
 
+// Czy karta „Urządzenia audio” jest rozwinięta — zapamiętywane na urządzeniu.
+const DEVICES_OPEN_KEY = "cashibot.devicesOpen";
+
 // iPhone/iPad (także Chrome na iOS — ten sam silnik WebKit). iPadOS przedstawia się jak Mac,
 // więc rozpoznajemy go po ekranie dotykowym.
 const isIOS =
@@ -62,6 +65,8 @@ const ctxInput = $("ctxInput");
 const logEl = $("log");
 const btMode = $("btMode");
 const audioBadges = $("audioBadges");
+const devicesCard = $("devicesCard");
+const devicesSummary = $("devicesSummary");
 
 // --- Stan -------------------------------------------------------------------
 
@@ -116,6 +121,12 @@ function renderAudioBadges() {
     make("✓ Noise suppression");
     make("✓ Auto gain control");
   }
+}
+
+// Skrót wybranych urządzeń w nagłówku zwiniętej karty.
+function updateDevicesSummary() {
+  const label = (sel) => sel.selectedOptions[0]?.textContent || "Domyślny (system)";
+  devicesSummary.textContent = `🎙️ ${label(micSelect)} · 🔊 ${label(spkSelect)}`;
 }
 
 function addLog(who, text) {
@@ -221,6 +232,7 @@ async function refreshDevices() {
   } catch (e) {
     console.warn("enumerateDevices:", e);
   }
+  updateDevicesSummary();
 }
 
 // Wybrany mikrofon mógł zostać odłączony — start z nieistniejącym urządzeniem by się
@@ -236,6 +248,7 @@ async function resolveInputDeviceId() {
   }
   console.warn("Wybrany mikrofon jest niedostępny — używam domyślnego.");
   micSelect.value = "";
+  updateDevicesSummary();
   return undefined;
 }
 
@@ -447,6 +460,12 @@ if (btMode) {
 // Push‑to‑Talk: wciśnięcie = mów, puszczenie = cisza.
 pttBtn.addEventListener("pointerdown", (e) => {
   e.preventDefault();
+  // Lekkie przesunięcie palca nie przerywa mówienia — przycisk trzyma wskaźnik do puszczenia.
+  try {
+    pttBtn.setPointerCapture(e.pointerId);
+  } catch {
+    /* starsze przeglądarki */
+  }
   pttHeld = true;
   pttBtn.classList.add("holding");
   applyMute();
@@ -459,6 +478,10 @@ const releasePtt = () => {
 };
 ["pointerup", "pointerleave", "pointercancel"].forEach((ev) =>
   pttBtn.addEventListener(ev, releasePtt)
+);
+// iOS: przytrzymanie nie może zaznaczać napisu ani otwierać menu kontekstowego.
+["selectstart", "contextmenu"].forEach((ev) =>
+  pttBtn.addEventListener(ev, (e) => e.preventDefault())
 );
 
 // Spacja jako Push‑to‑Talk (gdy aktywny tryb PTT i nie piszemy w polu kontekstu).
@@ -531,6 +554,23 @@ function init() {
   }
 
   updateMicModeUI();
+
+  // Karta „Urządzenia audio”: domyślnie zwinięta, stan zapamiętany na urządzeniu.
+  try {
+    devicesCard.open = localStorage.getItem(DEVICES_OPEN_KEY) === "1";
+  } catch {
+    /* brak dostępu do localStorage — zostaje zwinięta */
+  }
+  devicesCard.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(DEVICES_OPEN_KEY, devicesCard.open ? "1" : "0");
+    } catch {
+      /* ignoruj */
+    }
+  });
+  micSelect.addEventListener("change", updateDevicesSummary);
+  spkSelect.addEventListener("change", updateDevicesSummary);
+  updateDevicesSummary();
 
   // PWA: service worker (instalacja na ekranie głównym, szybsze otwieranie).
   if ("serviceWorker" in navigator && window.isSecureContext) {
