@@ -46,7 +46,7 @@ sprzężeniem zwrotnym (echo/zapętlanie). Gotowa do wdrożenia na **Railway** (
 
 ## Wymagania
 
-- Node.js ≥ 18 (zalecane 20+).
+- Node.js 22 (ustawione w `package.json` → `engines`; Railway wybiera tę wersję automatycznie).
 - Konto ElevenLabs z agentem Conversational AI (`agent_…`) oraz klucz API.
 
 ## Konfiguracja (zmienne środowiskowe)
