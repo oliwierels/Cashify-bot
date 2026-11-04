@@ -7,14 +7,12 @@
  *   2. Serwuje statyczny frontend z katalogu `public/`.
  *   3. Serwuje oficjalny pakiet przeglądarkowy SDK z `node_modules` pod `/vendor`
  *      (brak zależności od zewnętrznego CDN, brak kroku budowania).
- *   4. Opcjonalnie chroni mintowanie tokenów kodem dostępu (`ACCESS_CODE`).
  *
  * Nasłuchuje na `process.env.PORT` — wymóg Railway/Nixpacks (`npm start`).
  */
 
 import "dotenv/config";
 import path from "node:path";
-import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import express from "express";
@@ -40,9 +38,6 @@ const AGENT_ID = (process.env.ELEVENLABS_AGENT_ID || "").trim();
 // Opcjonalnie: ogranicz CORS do konkretnego origin (np. https://twoja-domena.up.railway.app).
 // Domyślnie odbicie origin żądania (wygodne, bo frontend i tak jest serwowany z tego serwera).
 const ALLOWED_ORIGIN = (process.env.ALLOWED_ORIGIN || "").trim();
-// Opcjonalnie: kod dostępu wymagany do rozpoczęcia rozmowy. Bez niego każdy, kto zna
-// adres aplikacji, może uruchamiać sesje na koszt konta ElevenLabs.
-const ACCESS_CODE = (process.env.ACCESS_CODE || "").trim();
 
 // Endpoint ElevenLabs mintujący token WebRTC (ten sam, którego używa oficjalny SDK).
 const TOKEN_URL = "https://api.elevenlabs.io/v1/convai/conversation/token";
@@ -56,36 +51,6 @@ if (!API_KEY) {
 if (!AGENT_ID) {
   console.error("FATAL: brak zmiennej ELEVENLABS_AGENT_ID.");
   process.exit(1);
-}
-
-// ---------------------------------------------------------------------------
-// Kod dostępu (opcjonalny)
-// ---------------------------------------------------------------------------
-
-// Globalny limit nieudanych prób (ochrona przed zgadywaniem kodu).
-const MAX_FAILED_ATTEMPTS = 20;
-const FAILED_WINDOW_MS = 15 * 60_000;
-let failedAttempts = 0;
-let failedWindowStart = Date.now();
-
-function safeEqual(a, b) {
-  const ha = crypto.createHash("sha256").update(a).digest();
-  const hb = crypto.createHash("sha256").update(b).digest();
-  return crypto.timingSafeEqual(ha, hb);
-}
-
-/** Zwraca kod HTTP błędu (401/429) albo null, gdy dostęp jest dozwolony. */
-function checkAccess(req) {
-  if (!ACCESS_CODE) return null;
-  if (Date.now() - failedWindowStart > FAILED_WINDOW_MS) {
-    failedAttempts = 0;
-    failedWindowStart = Date.now();
-  }
-  if (failedAttempts >= MAX_FAILED_ATTEMPTS) return 429;
-  const given = String(req.get("x-access-code") || "").trim();
-  if (given && safeEqual(given, ACCESS_CODE)) return null;
-  if (given) failedAttempts++;
-  return 401;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,24 +86,15 @@ app.use(
 
 // Health-check (przydatny dla monitoringu Railway).
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, agentConfigured: Boolean(AGENT_ID), accessCodeRequired: Boolean(ACCESS_CODE) });
+  res.json({ ok: true, agentConfigured: Boolean(AGENT_ID) });
 });
 
 /**
  * Mintuje krótkożyciowy token sesji WebRTC dla skonfigurowanego agenta.
  * Frontend przekazuje ten token do `Conversation.startSession({ connectionType: "webrtc", conversationToken })`.
  */
-app.get("/api/webrtc-token", async (req, res) => {
+app.get("/api/webrtc-token", async (_req, res) => {
   res.set("Cache-Control", "no-store");
-
-  const denied = checkAccess(req);
-  if (denied === 429) {
-    return res.status(429).json({ error: "Zbyt wiele błędnych kodów. Spróbuj ponownie za kilka minut." });
-  }
-  if (denied === 401) {
-    return res.status(401).json({ error: "Wymagany poprawny kod dostępu.", accessCodeRequired: true });
-  }
-
   try {
     const url = `${TOKEN_URL}?agent_id=${encodeURIComponent(AGENT_ID)}`;
     const response = await fetch(url, {
@@ -179,7 +135,6 @@ app.get(/^(?!\/api\/|\/vendor\/).*/, (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`CashiBot (WebRTC) nasłuchuje na porcie ${PORT}`);
   console.log(`Agent ID: ${AGENT_ID.slice(0, 10)}…`);
-  console.log(`Kod dostępu: ${ACCESS_CODE ? "włączony" : "WYŁĄCZONY (każdy z linkiem może rozmawiać)"}`);
   console.log(`Start: ${new Date().toISOString()}`);
 });
 

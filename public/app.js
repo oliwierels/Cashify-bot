@@ -36,8 +36,6 @@ const isIOS =
   /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
-// Kod dostępu (gdy serwer ma ustawione ACCESS_CODE) — zapamiętywany na urządzeniu.
-const ACCESS_CODE_KEY = "cashibot.accessCode";
 
 // --- Referencje do elementów ------------------------------------------------
 
@@ -74,7 +72,6 @@ let manualMuted = false; // ręczne wyciszenie (przycisk)
 let pttHeld = false; // czy trzymany jest przycisk Push‑to‑Talk
 let micMode = "duplex"; // 'open' | 'duplex' | 'ptt'
 let meterRAF = 0;
-let accessCode = loadAccessCode();
 
 // --- Pomocnicze -------------------------------------------------------------
 
@@ -161,46 +158,12 @@ function updateMicModeUI() {
   modeNote.textContent = MODE_NOTES[micMode] || "";
 }
 
-function loadAccessCode() {
-  try {
-    return localStorage.getItem(ACCESS_CODE_KEY) || "";
-  } catch {
-    return "";
-  }
-}
-
-function saveAccessCode(code) {
-  try {
-    if (code) localStorage.setItem(ACCESS_CODE_KEY, code);
-    else localStorage.removeItem(ACCESS_CODE_KEY);
-  } catch {
-    /* np. tryb prywatny — kod obowiązuje do odświeżenia strony */
-  }
-}
-
 // Pobiera krótkożyciowy token sesji WebRTC (klucz API zostaje na serwerze).
-// Gdy serwer wymaga kodu dostępu (401), pyta o niego i zapamiętuje poprawny.
 async function fetchToken() {
-  let promptText = "Podaj kod dostępu do CashiBota:";
-  for (;;) {
-    const res = await fetch("/api/webrtc-token", {
-      cache: "no-store",
-      headers: accessCode ? { "x-access-code": accessCode } : {},
-    });
-    if (res.status === 401) {
-      if (accessCode) promptText = "Nieprawidłowy kod dostępu. Spróbuj ponownie:";
-      accessCode = "";
-      saveAccessCode("");
-      const code = (window.prompt(promptText) || "").trim();
-      if (!code) throw new Error("Wymagany kod dostępu");
-      accessCode = code;
-      continue;
-    }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.token) throw new Error(data.error || `HTTP ${res.status}`);
-    saveAccessCode(accessCode);
-    return data.token;
-  }
+  const res = await fetch("/api/webrtc-token", { cache: "no-store" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.token) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.token;
 }
 
 // Czeka aż globalny obiekt SDK (window.ElevenLabsClient) będzie dostępny.

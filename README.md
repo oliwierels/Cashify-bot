@@ -59,7 +59,6 @@ Skopiuj `.env.example` do `.env` i uzupełnij:
 | `ELEVENLABS_AGENT_ID` | ✅ | ID agenta (`agent_…`). |
 | `PORT` | ➖ | Port. Na Railway ustawiany automatycznie. Lokalnie domyślnie `3000`. |
 | `ALLOWED_ORIGIN` | ➖ | Ogranicza CORS do podanego origin (domyślnie odbija origin żądania). |
-| `ACCESS_CODE` | ➖ (zalecane) | Kod dostępu wymagany do rozpoczęcia rozmowy. Bez niego każdy, kto zna link, może prowadzić rozmowy na koszt konta ElevenLabs. Aplikacja pyta o kod raz i zapamiętuje go na urządzeniu. Użyj min. 8 znaków — po 20 błędnych próbach w ciągu 15 min serwer blokuje tokeny (dla wszystkich) do końca okna. |
 
 ## Uruchomienie lokalne
 
@@ -78,7 +77,9 @@ npm start
 Po otwarciu publicznego adresu HTTPS:
 
 - **Android (Chrome):** menu ⋮ → **Zainstaluj aplikację** / **Dodaj do ekranu głównego**.
-- **iOS (Safari):** przycisk Udostępnij → **Do ekranu początkowego**.
+- **iOS 26 (Safari):** przycisk **⋯** obok paska adresu → **Udostępnij** → przewiń w dół →
+  **Do ekranu początkowego** → zostaw włączone „Otwórz jako aplikację” (*Open as Web App*) →
+  **Dodaj**.
 
 Aplikacja uruchamia się wtedy z ikony, na pełnym ekranie. Service worker (`public/sw.js`)
 działa w trybie *network-first*: zawsze pobiera najnowszą wersję po wdrożeniu, a cache służy
@@ -91,8 +92,7 @@ tylko do szybkiego otwarcia, gdy brak sieci. Żądania `/api/*` nigdy nie są ca
    - instalację: `npm install`
    - start: `npm start` (czyli `node server.js`)
    - `npm run build` jest no‑opem (frontend jest statyczny, bez budowania).
-3. W zakładce **Variables** ustaw `ELEVENLABS_API_KEY` i `ELEVENLABS_AGENT_ID`
-   (zalecane też `ACCESS_CODE`).
+3. W zakładce **Variables** ustaw `ELEVENLABS_API_KEY` i `ELEVENLABS_AGENT_ID`.
    `PORT` jest wstrzykiwany przez Railway — nie ustawiaj go ręcznie.
 4. Po wdrożeniu otwórz publiczny URL (HTTPS), zezwól na mikrofon, wybierz urządzenia i kliknij **Start**.
 
@@ -109,8 +109,8 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 
 | Metoda | Ścieżka | Opis |
 |---|---|---|
-| `GET` | `/api/health` | Health‑check: `{ ok, agentConfigured, accessCodeRequired }`. |
-| `GET` | `/api/webrtc-token` | Zwraca `{ token }` — krótkożyciowy token sesji WebRTC. Gdy ustawiono `ACCESS_CODE`, wymaga nagłówka `x-access-code` (inaczej `401`; po zbyt wielu błędach `429`). |
+| `GET` | `/api/health` | Health‑check: `{ ok, agentConfigured }`. |
+| `GET` | `/api/webrtc-token` | Zwraca `{ token }` — krótkożyciowy token sesji WebRTC. |
 | `GET` | `/vendor/lib.iife.js` | Oficjalny SDK przeglądarkowy (z `node_modules`). |
 
 ## Uwagi o urządzeniach audio
