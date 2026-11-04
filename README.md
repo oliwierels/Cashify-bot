@@ -129,3 +129,7 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
   W iOS 27 WebKit zmienia przy mikrofonie politykę trasy na `LongFormAudio`
   (`MediaSessionManagerCocoa.mm`) — po aktualizacji do iOS 27 przetestuj głośnik BT przed
   wydarzeniem.
+- **iPhone gra z telefonu zamiast z głośnika BT (także na stronach testowych WebRTC, np.
+  webrtc.github.io/samples → peerconnection/audio)?** To stan iOS, nie aplikacji — pomógł
+  restart iPhone'a (czasem dopiero kolejny). Przed wydarzeniem: połącz głośnik, uruchom krótką
+  rozmowę i sprawdź, skąd leci dźwięk; Android jako zapas.

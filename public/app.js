@@ -552,7 +552,7 @@ function init() {
   if (isIOS) {
     spkSelect.disabled = !outputSelectionSupported;
     setSpkHint(
-      "iPhone: głośnik wybiera iOS — strona nie może go wskazać. Połącz głośnik Bluetooth przed startem rozmowy; w trakcie można go wybrać w Centrum sterowania."
+      "iPhone: głośnik wybiera iOS — strona nie może go wskazać. Połącz głośnik Bluetooth przed startem rozmowy. Jeśli bot mimo to gra z telefonu, zrestartuj iPhone'a (iOS potrafi „zawiesić” trasę dźwięku dla wszystkich stron z mikrofonem)."
     );
     const btNote = btMode?.closest(".switch-field")?.querySelector("small");
     if (btNote) btNote.textContent = "Poprawka dla Androida. Na iPhonie trasę dźwięku wybiera iOS.";
