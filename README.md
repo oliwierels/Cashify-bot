@@ -123,23 +123,10 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 - Lista odświeża się automatycznie przy podłączeniu/odłączeniu sprzętu (`devicechange`).
 - **iPhone / iPad + głośnik Bluetooth:** każda przeglądarka na iOS (także Chrome) działa na
   silniku WebKit, który przy aktywnym mikrofonie ustawia sesję audio iOS w tryb rozmowy
-  (`PlayAndRecord` + `VideoChat`) — niezależnie od flag `getUserMedia`. Trik z Androida
-  (wyłączenie redukcji echa) nic tu nie zmienia, a strona nie ma API do zmiany tych ustawień.
-  W praktyce dźwięk bota potrafi przejść z głośnika BT na głośnik telefonu (Spotify działa,
-  bo nie używa mikrofonu). Na stoisko z głośnikiem BT używaj Androida albo komputera.
-
-## Struktura projektu
-
-```
-.
-├── server.js            # Backend: token WebRTC + serwowanie statyków i SDK
-├── package.json         # Skrypty (start/build) i zależności
-├── .env.example         # Wzór konfiguracji
-└── public/
-    ├── index.html             # UI
-    ├── styles.css             # Style
-    ├── app.js                 # Logika: WebRTC, wybór urządzeń, tryby mikrofonu, mierniki
-    ├── manifest.webmanifest   # PWA: nazwa, ikony, tryb pełnoekranowy
-    ├── sw.js                  # PWA: service worker (network-first)
-    └── icons/                 # Ikony aplikacji (Android, iOS)
-```
+  (`PlayAndRecord` + `VideoChat`) — niezależnie od flag `getUserMedia`, więc trik z Androida
+  (wyłączenie redukcji echa) nic tu nie zmienia. Na **iOS 26** dźwięk bota grał na głośniku BT.
+  Od **iOS 27** WebKit (gałąź `safari-7625`) ustawia przy przechwytywaniu mikrofonu politykę
+  trasy `LongFormAudio` zamiast `Default` (`MediaSessionManagerCocoa.mm`,
+  `HAVE(AVROUTING_FRAMEWORK)`) — najpewniej dlatego dźwięk przechodzi na głośnik telefonu.
+  Strona nie ma API, żeby to zmienić — do czasu poprawki od Apple na stoisko z głośnikiem BT
+  używaj Androida, komputera albo urządzenia z iOS 26.
