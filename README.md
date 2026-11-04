@@ -123,10 +123,9 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 - Lista odświeża się automatycznie przy podłączeniu/odłączeniu sprzętu (`devicechange`).
 - **iPhone / iPad + głośnik Bluetooth:** każda przeglądarka na iOS (także Chrome) działa na
   silniku WebKit, który przy aktywnym mikrofonie ustawia sesję audio iOS w tryb rozmowy
-  (`PlayAndRecord` + `VideoChat`) — niezależnie od flag `getUserMedia`, więc trik z Androida
-  (wyłączenie redukcji echa) nic tu nie zmienia. Na **iOS 26** dźwięk bota grał na głośniku BT.
-  Od **iOS 27** WebKit (gałąź `safari-7625`) ustawia przy przechwytywaniu mikrofonu politykę
-  trasy `LongFormAudio` zamiast `Default` (`MediaSessionManagerCocoa.mm`,
-  `HAVE(AVROUTING_FRAMEWORK)`) — najpewniej dlatego dźwięk przechodzi na głośnik telefonu.
-  Strona nie ma API, żeby to zmienić — do czasu poprawki od Apple na stoisko z głośnikiem BT
-  używaj Androida, komputera albo urządzenia z iOS 26.
+  (`PlayAndRecord` + `VideoChat`, opcje Bluetooth HFP + A2DP + `DefaultToSpeaker`) —
+  niezależnie od flag `getUserMedia`, więc trik z Androida (wyłączenie redukcji echa) nic tu
+  nie zmienia, a głośnik wybiera iOS. Ta logika jest identyczna w całej linii iOS 26.x.
+  W iOS 27 WebKit zmienia przy mikrofonie politykę trasy na `LongFormAudio`
+  (`MediaSessionManagerCocoa.mm`) — po aktualizacji do iOS 27 przetestuj głośnik BT przed
+  wydarzeniem.

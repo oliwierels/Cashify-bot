@@ -103,8 +103,7 @@ function renderAudioBadges() {
   if (isIOS) {
     // WebKit przy aktywnym mikrofonie zawsze ustawia sesję audio iOS w tryb rozmowy
     // (PlayAndRecord + VideoChat), niezależnie od flag getUserMedia — profilu A2DP
-    // nie da się wymusić ze strony. Od iOS 27 WebKit dodatkowo ustawia politykę trasy
-    // LongFormAudio także dla przechwytywania mikrofonu (na iOS 26 była Default).
+    // nie da się wymusić ze strony — głośnik wybiera iOS.
     make("🍎 iOS: tryb rozmowy — wyjście wybiera system", "off");
     make(bt ? "✕ Echo cancellation" : "✓ Echo cancellation", bt ? "off" : "");
     return;
@@ -553,8 +552,7 @@ function init() {
   if (isIOS) {
     spkSelect.disabled = !outputSelectionSupported;
     setSpkHint(
-      "iPhone: od iOS 27 przeglądarki (Safari i Chrome) inaczej kierują dźwięk, gdy strona używa mikrofonu — bot może grać przez głośnik telefonu zamiast przez głośnik Bluetooth (na iOS 26 działało). Jeśli tak się dzieje, użyj Androida albo komputera.",
-      true
+      "iPhone: głośnik wybiera iOS — strona nie może go wskazać. Połącz głośnik Bluetooth przed startem rozmowy; w trakcie można go wybrać w Centrum sterowania."
     );
     const btNote = btMode?.closest(".switch-field")?.querySelector("small");
     if (btNote) btNote.textContent = "Poprawka dla Androida. Na iPhonie trasę dźwięku wybiera iOS.";
