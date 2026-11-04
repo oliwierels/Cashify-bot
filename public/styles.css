@@ -48,6 +48,39 @@ header p { margin: 6px 0 0; color: var(--muted); font-size: 0.92rem; }
   border-radius: var(--radius);
   padding: 16px;
 }
+/* Zwijana karta (Urządzenia audio) */
+.collapsible > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.collapsible > summary::-webkit-details-marker { display: none; }
+.collapsible > summary h2 { margin: 0; flex-shrink: 0; }
+.collapsible > summary::after { content: "▾"; color: var(--muted); transition: transform 0.18s; }
+.collapsible[open] > summary { margin-bottom: 12px; }
+.collapsible[open] > summary::after { transform: rotate(180deg); }
+.summary-text {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.collapsible[open] .summary-text { display: none; }
+
+/* Elementy sterujące nie zaznaczają tekstu ani nie otwierają menu po przytrzymaniu (iOS). */
+button, summary, .segmented label, .switch-field {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .card h2 {
   margin: 0 0 12px;
   font-size: 0.82rem;
@@ -212,6 +245,14 @@ select:disabled { opacity: 0.5; }
 .btn:active { transform: scale(0.99); }
 .btn:disabled { opacity: 0.55; cursor: default; }
 .btn.danger { background: var(--danger); }
+
+/* Start / Zakończ rozmowę zawsze widoczny na dole ekranu — bez przewijania. */
+#toggleBtn {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
 .btn.secondary { background: var(--card-2); border: 1px solid var(--border); color: var(--text); font-size: 1rem; }
 
 .mic-controls { display: flex; gap: 8px; margin-top: 12px; }
@@ -222,6 +263,7 @@ select:disabled { opacity: 0.5; }
 /* Push-to-talk */
 #pttBtn {
   margin-top: 12px;
+  touch-action: none; /* przytrzymanie nie przewija strony ani nie anuluje mówienia */
   background: var(--accent-2);
   font-size: 1.15rem;
   padding: 22px;
