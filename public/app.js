@@ -30,6 +30,9 @@ const outputSelectionSupported =
   typeof HTMLMediaElement !== "undefined" &&
   "setSinkId" in HTMLMediaElement.prototype;
 
+// Wybrany agent — zapamiętywany na urządzeniu (każdy telefon może mieć swojego).
+const AGENT_KEY = "cashibot.agent";
+
 // Czy karta „Urządzenia audio” jest rozwinięta — zapamiętywane na urządzeniu.
 const DEVICES_OPEN_KEY = "cashibot.devicesOpen";
 
@@ -65,6 +68,7 @@ const ctxInput = $("ctxInput");
 const logEl = $("log");
 const btMode = $("btMode");
 const audioBadges = $("audioBadges");
+const agentPicker = $("agentPicker");
 const devicesCard = $("devicesCard");
 const devicesSummary = $("devicesSummary");
 
@@ -77,6 +81,8 @@ let manualMuted = false; // ręczne wyciszenie (przycisk)
 let pttHeld = false; // czy trzymany jest przycisk Push‑to‑Talk
 let micMode = "duplex"; // 'open' | 'duplex' | 'ptt'
 let meterRAF = 0;
+let agents = []; // [{ slug, name }] z /api/agents
+let selectedAgent = null;
 
 // --- Pomocnicze -------------------------------------------------------------
 
@@ -135,7 +141,7 @@ function addLog(who, text) {
   div.className = "msg " + cls;
   const label = document.createElement("span");
   label.className = "who";
-  label.textContent = who === "user" ? "Ty" : who === "ctx" ? "Kontekst" : "Bot";
+  label.textContent = who === "user" ? "Ty" : who === "ctx" ? "Kontekst" : selectedAgent?.name || "Bot";
   div.appendChild(label);
   div.appendChild(document.createTextNode(text));
   logEl.appendChild(div);
@@ -171,10 +177,68 @@ function updateMicModeUI() {
 
 // Pobiera krótkożyciowy token sesji WebRTC (klucz API zostaje na serwerze).
 async function fetchToken() {
-  const res = await fetch("/api/webrtc-token", { cache: "no-store" });
+  if (!selectedAgent) throw new Error("Brak skonfigurowanego agenta");
+  const res = await fetch(`/api/webrtc-token?agent=${encodeURIComponent(selectedAgent.slug)}`, {
+    cache: "no-store",
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.token) throw new Error(data.error || `HTTP ${res.status}`);
   return data.token;
+}
+
+// --- Agenci -----------------------------------------------------------------
+
+async function loadAgents() {
+  let defaultAgent = "";
+  try {
+    const res = await fetch("/api/agents", { cache: "no-store" });
+    const data = await res.json();
+    agents = data.agents || [];
+    defaultAgent = data.defaultAgent || "";
+  } catch (e) {
+    console.warn("agents:", e);
+    agents = [];
+  }
+  let stored = "";
+  try {
+    stored = localStorage.getItem(AGENT_KEY) || "";
+  } catch {
+    /* brak localStorage — pierwszy agent */
+  }
+  selectedAgent =
+    agents.find((a) => a.slug === stored) || agents.find((a) => a.slug === defaultAgent) || agents[0] || null;
+  renderAgentPicker();
+  if (!selectedAgent) setStatus("Błąd: brak skonfigurowanych agentów", "error");
+}
+
+function renderAgentPicker() {
+  agentPicker.innerHTML = "";
+  agentPicker.classList.toggle("hidden", agents.length < 2);
+  for (const agent of agents) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "agent-btn";
+    btn.textContent = agent.name;
+    btn.setAttribute("aria-pressed", String(agent === selectedAgent));
+    btn.addEventListener("click", () => {
+      if (conversation) return;
+      selectedAgent = agent;
+      try {
+        localStorage.setItem(AGENT_KEY, agent.slug);
+      } catch {
+        /* wybór obowiązuje do odświeżenia strony */
+      }
+      renderAgentPicker();
+    });
+    agentPicker.appendChild(btn);
+  }
+  document.title =
+    agents.length > 1 && selectedAgent ? `${selectedAgent.name} — CashiBot` : "CashiBot — asystent głosowy";
+}
+
+// W trakcie rozmowy (i łączenia) agenta nie można zmienić.
+function setAgentPickerLocked(locked) {
+  agentPicker.querySelectorAll("button").forEach((b) => (b.disabled = locked));
 }
 
 // Czeka aż globalny obiekt SDK (window.ElevenLabsClient) będzie dostępny.
@@ -277,10 +341,12 @@ async function ensurePermissionAndRefresh() {
 async function start() {
   // Blokada od razu — podwójne kliknięcie nie może otworzyć dwóch sesji.
   toggleBtn.disabled = true;
+  setAgentPickerLocked(true);
   const Conversation = await whenSdkReady();
   if (!Conversation) {
     setStatus("Błąd: nie udało się załadować SDK ElevenLabs", "error");
     toggleBtn.disabled = false;
+    setAgentPickerLocked(false);
     return;
   }
 
@@ -357,6 +423,7 @@ async function start() {
     // Nie zostawiaj otwartej sesji (i włączonego mikrofonu), jeśli błąd wystąpił po połączeniu.
     if (conv) conv.endSession().catch(() => {});
     toggleBtn.disabled = false;
+    setAgentPickerLocked(false);
   }
 }
 
@@ -386,6 +453,7 @@ function cleanup() {
   toggleBtn.textContent = "▶︎ Start rozmowy";
   toggleBtn.classList.remove("danger");
   toggleBtn.disabled = false;
+  setAgentPickerLocked(false);
   muteBtn.disabled = true;
   muteBtn.classList.remove("muted");
   muteBtn.textContent = "🎤 Wycisz mikrofon";
@@ -576,6 +644,12 @@ function init() {
   if ("serviceWorker" in navigator && window.isSecureContext) {
     navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("serviceWorker:", e));
   }
+
+  // Agenci do wyboru — Start dostępny dopiero, gdy wiadomo, z kim rozmawiać.
+  toggleBtn.disabled = true;
+  loadAgents().then(() => {
+    toggleBtn.disabled = !selectedAgent;
+  });
 
   // Wstępna enumeracja (etykiety mogą być puste do czasu przyznania uprawnień).
   refreshDevices();
