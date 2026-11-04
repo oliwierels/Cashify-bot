@@ -55,10 +55,31 @@ Skopiuj `.env.example` do `.env` i uzupełnij:
 
 | Zmienna | Wymagana | Opis |
 |---|---|---|
-| `ELEVENLABS_API_KEY` | ✅ | Klucz API (tylko po stronie serwera). |
-| `ELEVENLABS_AGENT_ID` | ✅ | ID agenta (`agent_…`). |
+| `ELEVENLABS_API_KEY` | ✅* | Domyślny klucz API (tylko po stronie serwera) — dla agentów bez własnego klucza. |
+| `AGENT_<NAZWA>_ID` | ✅* | ID agenta, np. `AGENT_LEXAI_ID`, `AGENT_BENIO_ID`, `AGENT_JERZY_ID`. Każda taka zmienna dodaje agenta do wyboru w aplikacji (nazwa bez podkreśleń). |
+| `AGENT_<NAZWA>_API_KEY` | ➖ | Osobny klucz API dla agenta z innego konta ElevenLabs, np. `AGENT_JERZY_API_KEY`. |
+| `AGENT_<NAZWA>_NAME` | ➖ | Nazwa przycisku. Domyślnie LexAI / Benio / Jerzy albo nazwa ze zmiennej. |
+| `ELEVENLABS_AGENT_ID` | ➖ | Stara konfiguracja. Bez żadnego `AGENT_<NAZWA>_ID` — jedyny agent (jak dotąd). Z nimi — agent zaznaczony domyślnie na nowych telefonach (spoza listy: dodany jako „CashiBot”). |
 | `PORT` | ➖ | Port. Na Railway ustawiany automatycznie. Lokalnie domyślnie `3000`. |
 | `ALLOWED_ORIGIN` | ➖ | Ogranicza CORS do podanego origin (domyślnie odbija origin żądania). |
+
+\* Potrzebny jest co najmniej jeden agent (`AGENT_<NAZWA>_ID` albo `ELEVENLABS_AGENT_ID`) i dla każdego
+klucz: własny `AGENT_<NAZWA>_API_KEY` albo wspólny `ELEVENLABS_API_KEY`. ID agentów i klucze trzymamy
+wyłącznie w Variables — nie w repozytorium.
+
+### Agenci pod jednym linkiem
+
+Wszyscy używają tego samego adresu aplikacji, a każdy wybiera na górze ekranu swojego agenta.
+Wybór jest zapamiętywany na danym telefonie; w trakcie rozmowy nie można go zmienić.
+Przykład Variables na Railway:
+
+```
+ELEVENLABS_API_KEY=...          # wspólny klucz
+AGENT_LEXAI_ID=agent_...
+AGENT_BENIO_ID=agent_...
+AGENT_JERZY_ID=agent_...
+AGENT_JERZY_API_KEY=...         # opcjonalnie, gdy Jerzy jest na innym koncie ElevenLabs
+```
 
 ## Uruchomienie lokalne
 
@@ -92,7 +113,7 @@ tylko do szybkiego otwarcia, gdy brak sieci. Żądania `/api/*` nigdy nie są ca
    - instalację: `npm install`
    - start: `npm start` (czyli `node server.js`)
    - `npm run build` jest no‑opem (frontend jest statyczny, bez budowania).
-3. W zakładce **Variables** ustaw `ELEVENLABS_API_KEY` i `ELEVENLABS_AGENT_ID`.
+3. W zakładce **Variables** ustaw `ELEVENLABS_API_KEY` i agentów (`AGENT_<NAZWA>_ID`, patrz wyżej).
    `PORT` jest wstrzykiwany przez Railway — nie ustawiaj go ręcznie.
 4. Po wdrożeniu otwórz publiczny URL (HTTPS), zezwól na mikrofon, wybierz urządzenia i kliknij **Start**.
 
@@ -109,8 +130,9 @@ Nie jest potrzebny Dockerfile — wystarcza standardowy setup Node.
 
 | Metoda | Ścieżka | Opis |
 |---|---|---|
-| `GET` | `/api/health` | Health‑check: `{ ok, agentConfigured }`. |
-| `GET` | `/api/webrtc-token` | Zwraca `{ token }` — krótkożyciowy token sesji WebRTC. |
+| `GET` | `/api/health` | Health‑check: `{ ok, agents }` (lista identyfikatorów agentów). |
+| `GET` | `/api/agents` | Agenci do wyboru: `{ agents: [{ slug, name }] }` (bez kluczy API). |
+| `GET` | `/api/webrtc-token?agent=<slug>` | Zwraca `{ token }` — krótkożyciowy token sesji WebRTC dla wybranego agenta. Bez `agent` działa tylko przy jednym agencie. |
 | `GET` | `/vendor/lib.iife.js` | Oficjalny SDK przeglądarkowy (z `node_modules`). |
 
 ## Uwagi o urządzeniach audio

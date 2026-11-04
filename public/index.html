@@ -65,8 +65,11 @@
   <div class="wrap">
     <header>
       <h1>CashiBot</h1>
-      <p>Rozmowa głosowa z agentem AI w czasie rzeczywistym (WebRTC). Wybierz mikrofon i głośnik, a następnie naciśnij „Start”.</p>
+      <p>Rozmowa głosowa z agentem AI w czasie rzeczywistym. Wybierz agenta i naciśnij „Start”.</p>
     </header>
+
+    <!-- Wybór agenta (zapamiętywany na tym urządzeniu; ukryty, gdy jest tylko jeden) -->
+    <div id="agentPicker" class="agent-picker hidden" role="group" aria-label="Agent"></div>
 
     <div id="secureWarning" class="banner hidden">
       ⚠️ Ta strona wymaga bezpiecznego połączenia (HTTPS) oraz dostępu do mikrofonu.

@@ -90,6 +90,30 @@ button, summary, .segmented label, .switch-field {
   font-weight: 700;
 }
 
+/* Wybór agenta */
+.agent-picker {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 6px;
+}
+.agent-btn {
+  padding: 12px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.agent-btn[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.18);
+  color: var(--text);
+}
+.agent-btn:disabled { opacity: 0.55; cursor: default; }
+
 /* Status pill */
 .status-bar {
   display: flex;
