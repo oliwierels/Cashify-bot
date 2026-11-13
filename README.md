@@ -95,7 +95,9 @@ npm start
 
 ## Instalacja na telefonie (PWA)
 
-Po otwarciu publicznego adresu HTTPS:
+Najprościej: wyślij link **`https://<adres-aplikacji>/instaluj`** — strona z przyciskiem
+„Zainstaluj aplikację” (Chrome na Androidzie) i instrukcją dla iPhone'a. Ręcznie, po otwarciu
+publicznego adresu HTTPS:
 
 - **Android (Chrome):** menu ⋮ → **Zainstaluj aplikację** / **Dodaj do ekranu głównego**.
 - **iOS 26 (Safari):** przycisk **⋯** obok paska adresu → **Udostępnij** → przewiń w dół →

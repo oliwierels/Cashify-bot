@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0d12" />
+  <title>Zainstaluj CashiBot</title>
+
+  <!-- Ten sam manifest co aplikacja: instalacja z tej strony instaluje CashiBota (start_url "/"). -->
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="CashiBot" />
+
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img class="install-icon" src="/icons/icon-192.png" alt="" width="96" height="96" />
+      <h1>CashiBot</h1>
+      <p>Zainstaluj aplikację na telefonie — uruchomisz ją z ikony, na pełnym ekranie.</p>
+    </header>
+
+    <div class="banner install-note">
+      Masz już starą aplikację CashiBot? Najpierw ją usuń (przytrzymaj ikonę → „Odinstaluj”).
+    </div>
+
+    <button id="installBtn" class="btn hidden">📲 Zainstaluj aplikację</button>
+    <div id="installedMsg" class="card hidden">
+      ✅ Zainstalowano. Otwórz CashiBota z nowej ikony na ekranie głównym.
+    </div>
+
+    <section class="card">
+      <h2>Jeśli przycisku nie ma</h2>
+      <ol class="install-steps">
+        <li><b>Android:</b> otwórz ten link w <b>Chrome</b> → menu <b>⋮</b> (prawy górny róg) →
+          <b>„Zainstaluj aplikację”</b> lub <b>„Dodaj do ekranu głównego”</b>.</li>
+        <li><b>iPhone:</b> otwórz ten link w <b>Safari</b> → <b>⋯</b> → <b>Udostępnij</b> →
+          <b>„Do ekranu początkowego”</b> → <b>Dodaj</b>.</li>
+      </ol>
+    </section>
+
+    <a class="btn secondary install-open" href="/">Otwórz w przeglądarce</a>
+  </div>
+
+  <script>
+    // Instalacja PWA jednym przyciskiem (Chrome na Androidzie udostępnia beforeinstallprompt).
+    (function () {
+      var installBtn = document.getElementById("installBtn");
+      var installedMsg = document.getElementById("installedMsg");
+      var deferred = null;
+
+      // Otwarte już jako zainstalowana aplikacja — od razu do rozmowy.
+      if (window.matchMedia("(display-mode: standalone)").matches) {
+        location.replace("/");
+        return;
+      }
+
+      function showInstalled() {
+        installBtn.classList.add("hidden");
+        installedMsg.classList.remove("hidden");
+      }
+
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferred = e;
+        installBtn.classList.remove("hidden");
+      });
+      window.addEventListener("appinstalled", showInstalled);
+
+      installBtn.addEventListener("click", function () {
+        if (!deferred) return;
+        deferred.prompt();
+        deferred.userChoice.then(function (choice) {
+          deferred = null;
+          if (choice.outcome === "accepted") showInstalled();
+          else installBtn.classList.add("hidden");
+        });
+      });
+
+      if ("serviceWorker" in navigator && window.isSecureContext) {
+        navigator.serviceWorker.register("/sw.js").catch(function (e) {
+          console.warn("serviceWorker:", e);
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
