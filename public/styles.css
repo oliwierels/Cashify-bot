@@ -296,6 +296,12 @@ select:disabled { opacity: 0.5; }
 #pttBtn.holding { background: var(--ok); transform: scale(0.99); }
 .hidden { display: none !important; }
 
+/* Strona instalacji (/instaluj) */
+.install-icon { display: block; margin: 8px auto 10px; border-radius: 22px; }
+.banner.install-note { background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.4); color: #c7d2fe; }
+.install-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; font-size: 0.92rem; line-height: 1.45; }
+.install-open { display: block; text-align: center; text-decoration: none; box-sizing: border-box; }
+
 /* Volume + meters */
 .slider-row { display: flex; align-items: center; gap: 12px; }
 .slider-row span:first-child { min-width: 92px; color: var(--muted); font-size: 0.88rem; }

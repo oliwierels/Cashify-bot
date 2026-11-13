@@ -193,6 +193,13 @@ app.use("/api", (_req, res) => {
   res.status(404).json({ error: "Nie znaleziono." });
 });
 
+// Link do instalacji aplikacji na telefonie (PWA): /instaluj
+app.get("/instaluj", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "instaluj.html"), {
+    headers: { "Cache-Control": "no-cache" },
+  });
+});
+
 // Fallback: każde inne żądanie GET (np. odświeżenie SPA-podobnej ścieżki) -> index.html.
 // Brakujące pliki (ścieżka z rozszerzeniem, np. /favicon.ico) dostają zwykłe 404.
 app.get(/^(?!\/api\/|\/vendor\/).*/, (req, res) => {
